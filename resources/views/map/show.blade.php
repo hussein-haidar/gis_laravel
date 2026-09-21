@@ -5,7 +5,7 @@
 @section('styles')
     <style>
         #map {
-            height: 360px;
+            height: clamp(320px, 46vh, 460px);
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
@@ -64,32 +64,107 @@
             z-index: 99999 !important;
             width: 100vw !important;
             height: 100vh !important;
+            width: 100dvw !important;
+            height: 100dvh !important;
             margin: 0 !important;
             border-radius: 0 !important;
             border: none !important;
         }
-        #map-card.nav-fullscreen #map {
-            height: calc(100vh - 120px) !important;
-            width: 100% !important;
-            border-radius: 0 !important;
+        #map-card.nav-fullscreen .card-body {
+            position: relative;
+            height: 100vh;
+            height: 100dvh;
+            max-height: 100%;
+            padding: 0 !important;
+            overflow: hidden;
         }
         #map-card.nav-fullscreen .card-body {
-            padding: 0 !important;
+            display: flex;
+            align-items: stretch;
+        }
+        #map-card.nav-fullscreen #map {
+            flex: 1 1 0;
+            width: 100%;
+            height: 100% !important;
+            min-height: 0;
+            border-radius: 0 !important;
         }
         #map-card.nav-fullscreen .d-none-fullscreen {
             display: none !important;
         }
+        #map-card.nav-fullscreen .nav-overlay { display: none !important; }
         .fs-nav-panel {
-            position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100;
+            position: absolute; z-index: 1100;
             background: rgba(255,255,255,0.98);
-            border-top: 3px solid #2563eb;
-            padding: 12px 16px;
+            display: none;
+            padding: 16px;
+        }
+
+        /* Default (mobile/HP): panduan navigasi DI SAMPING kanan peta. */
+        #map-card.nav-fullscreen .fs-nav-panel {
+            display: flex;
+            flex-direction: column;
+            top: 0; right: 0; bottom: 0;
+            width: min(290px, 82%);
+            border-left: 3px solid #2563eb;
+            border-radius: 0;
+            box-shadow: -6px 0 18px rgba(0,0,0,0.15);
+        }
+        .fs-nav-panel .fs-nav-steps {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+        }
+        .fs-nav-panel .fs-nav-head {
+            position: sticky; top: 0; background: #fff; z-index: 5;
+            padding-bottom: 8px;
+        }
+        #map-card.nav-fullscreen .fs-nav-head #fs-nav-title { font-size: 1.3rem !important; line-height: 1.25; }
+        #map-card.nav-fullscreen .fs-nav-head #fs-nav-sub { font-size: 0.9rem; }
+
+        /* Desktop (≥992px): panduan navigasi DI BAWAH peta. */
+        @media (min-width: 992px) {
+            #map-card.nav-fullscreen .card-body { flex-direction: column; }
+            #map-card.nav-fullscreen .fs-nav-panel {
+                position: static;
+                top: auto; right: auto; bottom: auto; left: auto;
+                width: 100%; height: 34%;
+                min-height: 130px;
+                border-left: 0; border-top: 3px solid #2563eb;
+                box-shadow: none;
+            }
+            #map-card.nav-fullscreen .fs-nav-steps {
+                flex-direction: row;
+                overflow-x: auto;
+                align-items: stretch;
+            }
+            #map-card.nav-fullscreen .fs-nav-steps .fs-step-item { min-width: 180px; max-width: 240px; }
+            #map-card.nav-fullscreen .fs-nav-head #fs-nav-title { font-size: 1.5rem !important; }
+            #map-card.nav-fullscreen .fs-nav-head #fs-nav-sub { font-size: 0.95rem; }
+        }
+
+        /* Pastikan tombol zoom in/out selalu terlihat di layar penuh. */
+        #map-card.nav-fullscreen .leaflet-control-zoom {
+            position: relative; z-index: 1200;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.35);
+        }
+
+        /* Popup alihkan rute saat kemacetan terdeteksi */
+        .reroute-popup {
+            position: absolute; left: 50%; top: 55%;
+            transform: translate(-50%, -50%);
+            z-index: 1300;
+            background: #fff; border: 1px solid #e5e7eb;
+            border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 16px; width: min(380px, calc(100vw - 48px));
             display: none;
         }
-        #map-card.nav-fullscreen .fs-nav-panel { display: block; }
-        .fs-nav-panel .fs-nav-steps {
-            max-height: 150px; overflow-y: auto;
-            border: 1px solid #e5e7eb; border-radius: 8px;
+        .reroute-popup.active { display: block; }
+        .reroute-popup .rp-title { font-size: 1.05rem; font-weight: 700; }
+        .reroute-popup .rp-icon { font-size: 1.6rem; }
+        @media (min-width: 768px) {
+            #map-card.nav-fullscreen .reroute-popup { left: calc(50% - 220px); }
         }
 
         .blue-dot {
@@ -117,13 +192,17 @@
             text-decoration: line-through;
         }
         .vehicle-btn {
-            width: 44px; height: 44px; border: 2px solid #e5e7eb;
-            border-radius: 12px; background: #fff; font-size: 1.4rem;
+            width: 48px; height: 48px; border: 2px solid #e5e7eb;
+            border-radius: 12px; background: #fff; font-size: 1.5rem;
             cursor: pointer; display: flex; align-items: center;
             justify-content: center; transition: all 0.15s ease;
         }
         .vehicle-btn:hover { border-color: #93c5fd; background: #eff6ff; }
-        .vehicle-btn.active { border-color: #2563eb; background: #dbeafe; box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+        .vehicle-btn.active {
+            border-color: #f59e0b; background: #ffd166;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.45);
+            transform: scale(1.08);
+        }
         .blue-dot-nav {
             width: 36px; height: 36px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
@@ -227,7 +306,7 @@
                     <div class="layer-badge" id="traffic-badge">⚠️ Kemacetan: Memuat...</div>
 
                     <div class="fs-nav-panel">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center justify-content-between mb-2 fs-nav-head">
                             <div>
                                 <div class="fw-bold" id="fs-nav-title" style="font-size:1.15rem;">--</div>
                                 <div class="small text-muted" id="fs-nav-sub"></div>
@@ -235,6 +314,20 @@
                             <button class="btn btn-sm btn-outline-danger" id="btn-exit-fullscreen">&times; Selesai</button>
                         </div>
                         <div class="fs-nav-steps list-group list-group-flush" id="fs-nav-steps"></div>
+                    </div>
+                </div>
+
+                <div class="reroute-popup" id="reroute-popup">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="rp-icon">⚠️</div>
+                        <div class="flex-grow-1">
+                            <div class="rp-title">Rute di depan macet!</div>
+                            <div class="small text-muted" id="reroute-info"></div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button type="button" class="btn btn-sm btn-warning flex-fill" id="btn-reroute-now">🛣️ Alihkan Rute</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" id="btn-reroute-skip">Lewati</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -245,11 +338,12 @@
                     <div class="mb-3">
                         <div class="info-label mb-1">Jenis Kendaraan</div>
                         <div class="vehicle-picker d-flex flex-wrap gap-2" id="vehicle-picker">
-                            <button type="button" class="vehicle-btn active" data-vehicle="mobil" data-profile="driving" data-icon="🚗" title="Mobil">🚗</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="motor" data-profile="driving" data-icon="🏍️" title="Motor">🏍️</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="sepeda" data-profile="cycling" data-icon="🚲" title="Sepeda">🚲</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="bis" data-profile="driving" data-icon="🚌" title="Bis">🚌</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="truk" data-profile="driving" data-icon="🚚" title="Truk">🚚</button>
+                            <button type="button" class="vehicle-btn active" data-vehicle="mobil" data-icon="🚗" title="Mobil">🚗</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="motor" data-icon="🏍️" title="Motor">🏍️</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="sepeda" data-icon="🚲" title="Sepeda">🚲</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="bis" data-icon="🚌" title="Bis">🚌</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="truk_sedang" data-icon="🚚" title="Truk Sedang">🚚</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="truk_besar" data-icon="🚛" title="Truk Besar">🚛</button>
                         </div>
                         <div class="text-muted small mt-1" id="vehicle-label">Mobil</div>
                     </div>
@@ -262,8 +356,7 @@
                             @endif
                         @endforeach
                     </select>
-                    <button class="btn btn-sm btn-primary w-100" id="btn-route-detail">Tampilkan Rute</button>
-                    <button class="btn btn-sm btn-success w-100 mt-2" id="btn-start-nav" style="display:none;">Mulai Navigasi</button>
+                    <button class="btn btn-sm btn-primary w-100" id="btn-route-detail">▶ Mulai Navigasi</button>
                     <div id="route-detail-info" class="mt-2 small"></div>
                     <div id="route-steps" class="mt-2" style="max-height:280px;overflow-y:auto;display:none;"></div>
                 </div>
@@ -271,13 +364,16 @@
 
             <div class="card mt-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Daftar Jalan Macet</span>
-                    <span class="badge text-white" id="traffic-count" style="display:none;background:#6b7280;">0</span>
+                    <span class="d-flex align-items-center">
+                        <span>Daftar Jalan Macet</span>
+                        <span class="badge text-white ms-2" id="traffic-count" style="display:none;background:#6b7280;">0</span>
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-congestion-reload" title="Muat ulang data kemacetan">🔄 Muat Ulang</button>
                 </div>
                 <div class="card-body">
-                    <div class="text-muted small mb-2" id="traffic-list-sub">Belum ada data.</div>
+                    <div class="text-muted small mb-2" id="traffic-list-sub">Memuat data kemacetan...</div>
                     <div id="traffic-list" style="max-height:320px;overflow-y:auto;">
-                        <div class="text-muted small">Memuat data kemacetan...</div>
+                        <div class="text-muted small">Mencari jalan & titik kemacetan di sekitar...</div>
                     </div>
                 </div>
             </div>
@@ -312,6 +408,7 @@
         const lng = {{ $location->longitude }};
         const name = @json($location->name);
         const color = @json($location->category?->color ?? '#3b82f6');
+        const isLoggedIn = @json(auth()->check());
 
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '&copy; OpenStreetMap'
@@ -320,10 +417,12 @@
             maxZoom: 19, attribution: '&copy; Esri'
         });
         const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            maxZoom: 17, attribution: '&copy; OpenTopoMap + OSM'
+            maxZoom: 17, attribution: '&copy; OpenTopoMap'
         });
 
         const map = L.map('map', { layers: [osm] }).setView([lat, lng], 13);
+        map.setMinZoom(2);
+        map.options.worldCopyJump = false;
         L.control.scale({ imperial: false }).addTo(map);
 
         function getTrafficSeverity() {
@@ -378,9 +477,19 @@
             renderCongestionList();
         }
 
+        function fetchWithTimeout(url, ms) {
+            const controller = new AbortController();
+            const timer = setTimeout(function () { controller.abort(); }, ms);
+            return fetch(url, { signal: controller.signal }).finally(function () { clearTimeout(timer); });
+        }
+
+        const API_BASE = '{{ url('api/v1') }}';
+
         function loadTomTomTraffic(centerLat, centerLng, zoom) {
-            const url = `/api/v1/traffic/flow?lat=${centerLat}&lng=${centerLng}&zoom=${zoom}`;
-            fetch(url)
+            const url = `${API_BASE}/traffic/flow?lat=${centerLat}&lng=${centerLng}&zoom=${zoom}`;
+            const sub = document.getElementById('traffic-list-sub');
+            if (sub) sub.textContent = 'Mencari kemacetan real-time (TomTom)...';
+            fetchWithTimeout(url, 10000)
                 .then(r => r.json())
                 .then(function (data) {
                     if (data.status === 'ok' && data.segments && data.segments.length > 0) {
@@ -501,6 +610,8 @@
                 badge.textContent = '⚠️ Kemacetan: Simulasi (mencari jalan terdekat...)';
                 badge.style.display = 'block';
             }
+            const sub = document.getElementById('traffic-list-sub');
+            if (sub) sub.textContent = 'Mencari jalan terdekat dari data OSM...';
 
             // Ambil daftar JALAN asli (ber-Nama) dari OSM (Overpass) di bounding box
             // kecil. Titik kemacetan SELALU digambar di atas jalan/darat — tidak ada
@@ -525,7 +636,7 @@
                     if (badge) badge.textContent = 'ℹ️ Tidak ada data kemacetan di area ini.';
                     return;
                 }
-                fetch(endpoints[i] + '?data=' + encodeURIComponent(query))
+                fetchWithTimeout(endpoints[i] + '?data=' + encodeURIComponent(query), 8000)
                     .then(r => {
                         if (!r.ok) throw new Error('HTTP ' + r.status);
                         return r.json();
@@ -575,6 +686,134 @@
 
         loadDynamicCongestion(lat, lng);
 
+        document.getElementById('btn-congestion-reload').addEventListener('click', function () {
+            lastCongestionRefresh = 0;
+            loadDynamicCongestion(lat, lng);
+        });
+
+        // ── Deteksi kemacetan & tawarkan alihkan rute saat navigasi ─────────────
+        let lastRerouteCheck = 0;
+        let rerouteShownAt = 0;
+        let rerouteDisabledUntil = 0;
+
+        function checkCongestionReroute(curLat, curLng) {
+            const now = Date.now();
+            if (now - lastRerouteCheck < 15000) return;
+            lastRerouteCheck = now;
+            if (now < rerouteDisabledUntil || now - rerouteShownAt < 45000) return;
+
+            const severe = congestionItems.filter(function (it) {
+                if (it.level !== 'severe') return false;
+                const d = haversineKm(curLat, curLng, it.lat, it.lng);
+                return d >= 0.15 && d <= 1.5;
+            });
+            if (!severe.length) return;
+
+            const nearest = severe.reduce(function (a, b) {
+                return haversineKm(curLat, curLng, a.lat, a.lng) <= haversineKm(curLat, curLng, b.lat, b.lng) ? a : b;
+            });
+            const distM = Math.round(haversineKm(curLat, curLng, nearest.lat, nearest.lng) * 1000);
+
+            document.getElementById('reroute-info').textContent =
+                'Macet terdeteksi di "' + nearest.name + '" ±' + distM + ' m dari posisimu.';
+            rerouteShownAt = now;
+            document.getElementById('reroute-popup').classList.add('active');
+        }
+
+        function hideReroutePopup() {
+            document.getElementById('reroute-popup').classList.remove('active');
+        }
+
+        function distanceToGeoKm(point, geometry) {
+            const step = Math.max(1, Math.floor(geometry.length / 300));
+            let min = Infinity;
+            for (let i = 0; i < geometry.length; i += step) {
+                const d = haversineKm(point[0], point[1], geometry[i][0], geometry[i][1]);
+                if (d < min) min = d;
+            }
+            return min;
+        }
+
+        function findAlternativeRoute() {
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                const clat = pos.coords.latitude;
+                const clng = pos.coords.longitude;
+
+                fetch(API_BASE + '/routing/route', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        origin: [clat, clng],
+                        destination: [lat, lng],
+                        vehicle: selectedVehicle,
+                        avoid_toll: false,
+                        avoid_traffic: true,
+                        avoid_low_bridge: true,
+                        alternatives: true,
+                        instructions: true,
+                    }),
+                })
+                    .then(r => r.json())
+                    .then(function (data) {
+                        hideReroutePopup();
+                        if (data.status !== 'ok') { alert('Rute alternatif tidak tersedia.'); return; }
+
+                        const routes = (data.routes && data.routes.length) ? data.routes : [data];
+                        let chosen = null;
+                        if (routes.length > 1) {
+                            const severe = congestionItems.filter(function (c) { return c.level === 'severe'; });
+                            for (let i = 1; i < routes.length; i++) {
+                                const g = routes[i].geometry || [];
+                                if (!g.length) continue;
+                                let hit = false;
+                                for (let s = 0; s < severe.length; s++) {
+                                    if (distanceToGeoKm([severe[s].lat, severe[s].lng], g) < 0.06) { hit = true; break; }
+                                }
+                                if (!hit) { chosen = routes[i]; break; }
+                            }
+                        }
+                        if (!chosen) {
+                            chosen = routes[0];
+                            document.getElementById('route-detail-info').innerHTML = '<span class="text-warning">⚠️ Alternatif bebas-macet tidak tersedia. Memakai rute tercepat.</span>';
+                        } else {
+                            document.getElementById('route-detail-info').innerHTML = '<span class="text-success">✅ Rute alternatif (ungu) dipilih — menghindari macet parah.</span>';
+                        }
+
+                        const coords = chosen.geometry || [];
+                        if (!coords.length) { alert('Rute alternatif tidak ditemukan.'); return; }
+
+                        if (routeLayer) map.removeLayer(routeLayer);
+                        routeLayer = L.polyline(coords, { color: '#7c3aed', weight: 5, opacity: 0.85 }).addTo(map);
+                        routeGeometryCoords = coords;
+                        historyDistanceKm = (chosen.distance_m || 0) / 1000;
+                        historyDurationSec = chosen.duration_s || 0;
+                        routeSteps = (chosen.instructions || []).map(function (s) {
+                            return {
+                                maneuver: {
+                                    type: translateManeuver(s.maneuver),
+                                    location: (s.location && s.location.length === 2) ? [s.location[1], s.location[0]] : null,
+                                },
+                                name: s.instruction || '',
+                                distance: s.distance_m || 0,
+                                duration: s.duration_s || 0,
+                            };
+                        });
+                        currentStepIndex = 0;
+                        renderSteps(routeSteps);
+                        updateNavOverlay(0);
+                        map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                        setTimeout(function () { map.invalidateSize(); }, 250);
+                    })
+                    .catch(function () { alert('Gagal mencari rute alternatif.'); });
+            }, function () { alert('Gagal mendapatkan posisi GPS.'); }, { enableHighAccuracy: true, timeout: 10000 });
+        }
+
+        document.getElementById('btn-reroute-now').addEventListener('click', findAlternativeRoute);
+        document.getElementById('btn-reroute-skip').addEventListener('click', function () {
+            hideReroutePopup();
+            rerouteDisabledUntil = Date.now() + 5 * 60 * 1000;
+        });
+
         // Kemacetan = LAYER OVERLAY (checkbox), bukan base layer, supaya tidak
         // menggantikan peta dasar (yang membuat peta jadi blank/abu-abu).
         congestionLayer.addTo(map);
@@ -622,7 +861,6 @@
         })();
 
         let selectedVehicle = 'mobil';
-        let selectedProfile = 'driving';
         let selectedIcon = '🚗';
 
         document.querySelectorAll('.vehicle-btn').forEach(function (btn) {
@@ -630,7 +868,6 @@
                 document.querySelectorAll('.vehicle-btn').forEach(function (b) { b.classList.remove('active'); });
                 btn.classList.add('active');
                 selectedVehicle = btn.dataset.vehicle;
-                selectedProfile = btn.dataset.profile;
                 selectedIcon = btn.dataset.icon;
                 document.getElementById('vehicle-label').textContent = btn.title;
             });
@@ -641,6 +878,89 @@
         let navWatchId = null;
         let blueDotMarker = null;
         let currentStepIndex = 0;
+
+        // ── Riwayat perjalanan ──────────────────────────────────────────────────
+        let routeGeometryCoords = [];
+        let historyDistanceKm = null;
+        let historyDurationSec = null;
+        let activeHistoryId = null;
+        let navStartTime = null;
+        let navHistoryFinished = false;
+
+        function csrfToken() {
+            const m = document.querySelector('meta[name="csrf-token"]');
+            return m ? m.getAttribute('content') : '';
+        }
+
+        function originInfo() {
+            const sel = document.getElementById('route-from-detail');
+            const val = sel.value;
+            if (val === 'gps') {
+                return { name: '📍 Lokasi Saya (GPS)', lat: null, lng: null };
+            }
+            const parts = String(val).split(',');
+            return {
+                name: sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : 'Asal',
+                lat: parseFloat(parts[0]),
+                lng: parseFloat(parts[1]),
+            };
+        }
+
+        function startHistory() {
+            if (!isLoggedIn) return;
+            const o = originInfo();
+            const steps = (routeSteps || []).map(function (s) {
+                return {
+                    distance: s.distance,
+                    duration: s.duration,
+                    type: (s.maneuver || {}).type,
+                    name: s.name || '',
+                };
+            });
+            fetch('{{ route("history.store") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+                body: JSON.stringify({
+                    origin_name: o.name,
+                    origin_lat: o.lat,
+                    origin_lng: o.lng,
+                    dest_name: name,
+                    dest_lat: lat,
+                    dest_lng: lng,
+                    vehicle: selectedVehicle,
+                    profile: selectedVehicle,
+                    distance_km: historyDistanceKm,
+                    duration_sec: historyDurationSec,
+                    route_geometry: routeGeometryCoords,
+                    steps: steps,
+                }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data && data.id) {
+                        activeHistoryId = data.id;
+                        navStartTime = Date.now();
+                        navHistoryFinished = false;
+                    }
+                })
+                .catch(function () { activeHistoryId = null; });
+        }
+
+        function finishHistory() {
+            if (!activeHistoryId || navHistoryFinished) return;
+            navHistoryFinished = true;
+            const travel = Math.round((Date.now() - navStartTime) / 1000);
+            fetch('{{ route("history.finish", "__HISTORY__") }}'.replace('__HISTORY__', activeHistoryId), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+                body: JSON.stringify({ travel_seconds: travel }),
+            })
+                .catch(function () {})
+                .finally(function () {
+                    activeHistoryId = null;
+                    navStartTime = null;
+                });
+        }
 
         const osrmIcons = {
             turn: '↗', depart: '🏁', arrive: '📍',
@@ -707,6 +1027,7 @@
                 document.getElementById('nav-remaining').textContent = '';
                 document.getElementById('fs-nav-title').textContent = '📍 Tiba di tujuan!';
                 document.getElementById('fs-nav-sub').textContent = name;
+                finishHistory();
                 return;
             }
             const step = routeSteps[stepIdx];
@@ -754,6 +1075,7 @@
             map.setView([curLat, curLng], map.getZoom(), { animate: true });
 
             loadDynamicCongestion(curLat, curLng);
+            checkCongestionReroute(curLat, curLng);
 
             let step = routeSteps[currentStepIndex];
             if (!step) return;
@@ -776,14 +1098,18 @@
             currentStepIndex = 0;
             updateNavOverlay(0);
             document.getElementById('nav-overlay').style.display = 'block';
+            startHistory();
 
             const card = document.getElementById('map-card');
             if (!card.classList.contains('nav-fullscreen')) {
                 card.classList.add('nav-fullscreen');
                 document.body.style.overflow = 'hidden';
                 setTimeout(function () { map.invalidateSize(); }, 350);
+                setTimeout(function () { map.invalidateSize(); }, 800);
                 if (routeLayer && routeLayer._map) map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
             }
+
+            if (!map.hasLayer(congestionLayer)) map.addLayer(congestionLayer);
 
             createBlueDot();
 
@@ -809,56 +1135,118 @@
             document.getElementById('nav-overlay').style.display = 'none';
             if (blueDotMarker && blueDotMarker._map) map.removeLayer(blueDotMarker);
             blueDotMarker = null;
+            finishHistory();
             exitFullscreen();
         }
 
         document.getElementById('nav-close-btn').addEventListener('click', stopNavigation);
-        document.getElementById('btn-start-nav').addEventListener('click', startNavigation);
         document.getElementById('btn-exit-fullscreen').addEventListener('click', stopNavigation);
+
+        // Safari/Chrome Android, rotasi layar, resize window: pastikan Leaflet
+        // menghitung ulang ukuran tile. Panggil invalidateSize bertahap agar
+        // menunggu browser selesai melakukan reflow (CSS breakpoint, address bar, dll).
+        let _resizeInvalidateTimer = null;
+        function _invalidateMapSize() {
+            const c = document.getElementById('map-card');
+            if (!c || !c.classList.contains('nav-fullscreen')) return;
+            map.invalidateSize();
+        }
+        function _onResize() {
+            _invalidateMapSize();
+            setTimeout(_invalidateMapSize, 200);
+            setTimeout(_invalidateMapSize, 600);
+            if (_resizeInvalidateTimer) clearTimeout(_resizeInvalidateTimer);
+            _resizeInvalidateTimer = setTimeout(_invalidateMapSize, 1000);
+        }
+        window.addEventListener('resize', _onResize);
+        window.addEventListener('orientationchange', function () {
+            setTimeout(_invalidateMapSize, 350);
+            setTimeout(_invalidateMapSize, 800);
+        });
+
+        // Terjemahkan penanda maneuver GraphHopper (angka) / OSRM (teks) → standar.
+        const GH_SIGN = {
+            0: 'continue', 1: 'turn slight right', 2: 'turn right', 3: 'turn sharp right',
+            4: 'uturn', 5: 'turn sharp left', 6: 'turn left', 7: 'turn slight left',
+            8: 'arrive', 9: 'depart', 10: 'fork', 11: 'merge', 12: 'roundabout',
+            13: 'on ramp', 14: 'off ramp', 15: 'end of road', 16: 'new name',
+            17: 'new name', '-18': 'continue'
+        };
+        function translateManeuver(m) {
+            return typeof m === 'number' ? (GH_SIGN[m] || 'continue') : (m || 'continue');
+        }
 
         document.getElementById('btn-route-detail').addEventListener('click', function () {
             const fromVal = document.getElementById('route-from-detail').value;
             if (!fromVal) { alert('Pilih lokasi asal.'); return; }
 
-            document.getElementById('route-detail-info').textContent = 'Memuat...';
+            const info = document.getElementById('route-detail-info');
+            info.textContent = 'Mencari rute... (mengikuti jenis kendaraan)';
             stopNavigation();
+            if (routeLayer) map.removeLayer(routeLayer);
+            routeLayer = null;
 
             function doRoute(fromCoords) {
-                fetch(`https://router.project-osrm.org/route/v1/${selectedProfile}/${fromCoords[1]},${fromCoords[0]};${lng},${lat}?overview=full&geometries=geojson&steps=true`)
+                fetch(API_BASE + '/routing/route', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        origin: fromCoords,
+                        destination: [lat, lng],
+                        vehicle: selectedVehicle,
+                        avoid_toll: false,
+                        avoid_traffic: false,
+                        avoid_low_bridge: true,
+                        instructions: true,
+                    }),
+                })
                     .then(r => r.json())
                     .then(function (data) {
-                        if (data.code !== 'Ok') { document.getElementById('route-detail-info').textContent = 'Rute tidak ditemukan.'; return; }
+                        if (data.status !== 'ok') { info.textContent = 'Gagal: ' + (data.message || 'tidak ada rute.'); return; }
 
-                        const route = data.routes[0];
-                        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                        const coords = data.geometry || [];
+                        if (!coords.length) { info.textContent = 'Rute tidak ditemukan.'; return; }
 
-                        if (routeLayer) map.removeLayer(routeLayer);
-                        routeLayer = L.polyline(coords, { color: '#3b82f6', weight: 5, opacity: 0.8 }).addTo(map);
+                        routeLayer = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: 0.8 }).addTo(map);
                         map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
-                        const dist = (route.distance / 1000).toFixed(1);
-                        const dur = Math.round(route.duration / 60);
+                        routeGeometryCoords = coords;
+                        historyDistanceKm = (data.distance_m || 0) / 1000;
+                        historyDurationSec = data.duration_s || 0;
+
+                        const dist = (historyDistanceKm).toFixed(1);
+                        const dur = Math.round((data.duration_s || 0) / 60);
                         const durJam = Math.floor(dur / 60);
-                        const sisa = dur % 60;
 
-                        document.getElementById('route-detail-info').innerHTML =
-                            `<strong>Jarak:</strong> ${dist} km<br><strong>Waktu:</strong> ${durJam > 0 ? durJam + ' jam ' + sisa + ' menit' : dur + ' menit'}`;
-
-                        if (route.legs && route.legs[0] && route.legs[0].steps) {
-                            routeSteps = route.legs[0].steps;
-                            renderSteps(routeSteps);
+                        let html = `<strong>Jarak:</strong> ${dist} km<br><strong>Waktu:</strong> ${durJam > 0 ? durJam + ' jam ' + (dur % 60) + ' menit' : dur + ' menit'}`;
+                        if (data.warnings && data.warnings.length) {
+                            html += '<br><span class="text-danger small">' + data.warnings.join('<br>') + '</span>';
                         }
+                        info.innerHTML = html;
 
-                        document.getElementById('btn-start-nav').style.display = 'block';
+                        routeSteps = (data.instructions || []).map(function (s) {
+                            return {
+                                maneuver: {
+                                    type: translateManeuver(s.maneuver),
+                                    location: (s.location && s.location.length === 2) ? [s.location[1], s.location[0]] : null,
+                                },
+                                name: s.instruction || '',
+                                distance: s.distance_m || 0,
+                                duration: s.duration_s || 0,
+                            };
+                        });
+                        renderSteps(routeSteps);
+
+                        startNavigation();
                     })
-                    .catch(function () { document.getElementById('route-detail-info').textContent = 'Gagal memuat rute.'; });
+                    .catch(function () { info.textContent = 'Gagal memuat rute.'; });
             }
 
             if (fromVal === 'gps') {
-                if (!navigator.geolocation) { document.getElementById('route-detail-info').textContent = 'Browser tidak mendukung GPS.'; return; }
+                if (!navigator.geolocation) { info.textContent = 'Browser tidak mendukung GPS.'; return; }
                 navigator.geolocation.getCurrentPosition(
                     function (pos) { doRoute([pos.coords.latitude, pos.coords.longitude]); },
-                    function (err) { document.getElementById('route-detail-info').textContent = 'Gagal mendapatkan GPS: ' + err.message; },
+                    function (err) { info.textContent = 'Gagal mendapatkan GPS: ' + err.message; },
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
             } else {

@@ -47,6 +47,8 @@ class RoutingController extends Controller
             'avoid_low_bridge' => ['nullable', 'boolean'],
             'max_height' => ['nullable', 'numeric'],
             'instructions' => ['nullable', 'boolean'],
+            'alternatives' => ['nullable', 'boolean'],
+            'engine' => ['nullable', 'string', 'in:osrm_local,graphhopper,osrm_public,tomtom'],
         ]);
 
         $vehicle = $validated['vehicle'] ?? 'mobil';
@@ -61,6 +63,8 @@ class RoutingController extends Controller
                 'avoid_low_bridge' => $request->boolean('avoid_low_bridge'),
                 'max_height' => $validated['max_height'] ?? null,
                 'instructions' => $request->boolean('instructions'),
+                'alternatives' => $request->boolean('alternatives'),
+                'engine' => $validated['engine'] ?? null,
             ]
         );
 

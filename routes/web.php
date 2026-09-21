@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GeoJsonController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\NavigasiController;
+use App\Http\Controllers\NavigationHistoryController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MapController::class, 'index'])->name('map.index');
@@ -25,6 +26,15 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
+
+// ── Riwayat Navigasi (untuk semua user login) ────────────────────────────────
+Route::middleware('auth')->prefix('riwayat')->name('history.')->group(function () {
+    Route::get('/', [NavigationHistoryController::class, 'index'])->name('index');
+    Route::post('/', [NavigationHistoryController::class, 'store'])->name('store');
+    Route::get('{navigationHistory}', [NavigationHistoryController::class, 'show'])->name('show');
+    Route::post('{navigationHistory}/selesai', [NavigationHistoryController::class, 'finish'])->name('finish');
+    Route::delete('{navigationHistory}', [NavigationHistoryController::class, 'destroy'])->name('destroy');
+});
 
 // ── Super Admin Routes ───────────────────────────────────────────────────────
 Route::middleware(['auth', 'role:super_admin'])->prefix('super-admin')->name('super-admin.')->group(function () {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'GIS Laravel') - {{ config('app.name') }}</title>
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -34,6 +35,9 @@
                     <a class="nav-link" href="{{ route('navigasi.index') }}">Navigasi</a>
                 </li>
                 @auth
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('history.index') }}">Riwayat</a>
+                    </li>
                     @if (Auth::user()->hasRole('super_admin'))
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Super Admin</a>

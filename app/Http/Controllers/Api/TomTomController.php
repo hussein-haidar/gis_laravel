@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Traffic\TomTomTrafficService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class TomTomController extends Controller
 {
+    public function __construct(protected TomTomTrafficService $traffic)
+    {
+    }
+
     /**
      * Proxy Traffic Flow dari TomTom supaya API key tidak bocor ke browser.
      *
@@ -23,11 +27,8 @@ class TomTomController extends Controller
     {
         $lat = (float) $request->query('lat');
         $lng = (float) $request->query('lng');
-        $zoom = (int) $request->query('zoom', 14);
 
-        $key = config('services.tomtom.key');
-
-        if (! $key) {
+        if (! $this->traffic->enabled()) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'TOMMTOM_API_KEY belum diatur. Daftar gratis di https://my.tomtom.com lalu isi kuncinya di .env',
@@ -38,99 +39,105 @@ class TomTomController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Koordinat tidak valid.'], 422);
         }
 
-        // Cari segmen terdekat dengan `point`. Zoom dikunci 16 (tinggi) agar
-        // hanya jalan penting yang muncul dan kuota request tetap hemat.
-        $style = 'absolute';
-        $segZoom = 16;
+        $segment = $this->traffic->flowSegmentAt($lat, $lng);
 
-        $url = rtrim(config('services.tomtom.traffic_url'), '/')
-            . "/flowSegmentData/{$style}/{$segZoom}/json";
+        return response()->json([
+            'status' => 'ok',
+            'segments' => $segment === null ? [] : [$segment],
+        ]);
+    }
+
+    /**
+     * Kumpulkan titik kemacetan dinamis di sepanjang rute.
+     *
+     * POST /api/v1/traffic/flow-along
+     * body: { points: [[lat,lng], ...] }
+     *
+     * Semua segmen berasal dari geometri jalan asli TomTom — tidak pernah
+     * menghasilkan titik acak/di tengah laut.
+     */
+    public function flowAlong(Request $request)
+    {
+        $validated = $request->validate([
+            'points' => ['required', 'array', 'min:2', 'max:2000'],
+            'points.*' => ['array', 'size:2'],
+            'points.*.0' => ['required', 'numeric', 'between:-90,90'],
+            'points.*.1' => ['required', 'numeric', 'between:-180,180'],
+        ]);
 
         try {
-            $response = Http::timeout(config('services.tomtom.timeout', 15))
-                ->withOptions(['verify' => false])
-                ->get($url, [
-                    'key' => $key,
-                    'point' => "{$lat},{$lng}",
-                ]);
-
-            if (! $response->successful()) {
-                Log::warning("[TomTom] HTTP {$response->status()}: {$response->body()}");
-                return response()->json([
-                    'status' => 'error',
-                    'message' => "TomTom HTTP {$response->status()}.",
-                    'detail'   => $response->json(),
-                ], $response->status());
-            }
-
-            $data = $response->json();
-
-            // Bentuk ringkas untuk frontend (selalu array, meski hanya 1 segmen).
-            $segment = $this->extractFlow($data['flowSegmentData'] ?? []);
-
-            return response()->json([
-                'status'   => 'ok',
-                'segments' => $segment === null ? [] : [$segment],
-            ]);
+            $segments = $this->traffic->flowAlong($validated['points']);
         } catch (\Throwable $e) {
-            Log::warning('[TomTom] exception: ' . $e->getMessage());
+            Log::warning('[TomTom] flow-along exception: ' . $e->getMessage());
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'Gagal mengambil data traffic TomTom.',
+                'message' => 'Gagal mengambil data kemacetan sepanjang rute.',
             ], 500);
         }
+
+        return response()->json([
+            'status' => 'ok',
+            'segments' => $segments,
+        ]);
     }
 
     /**
-     * Ubah satu objek flowSegmentData menjadi bentuk ringkas untuk Leaflet.
+     * Ambil segmen kemacetan di seluruh viewport (bounds).
+     * Sample grid 3x3 di area bounds, panggil flowSegmentAt per titik.
+     * Hasil dide-dupe by midpoint.
+     *
+     * POST /api/v1/traffic/flow-bounds
+     * body: { lat_min, lng_min, lat_max, lng_max, zoom }
      */
-    protected function extractFlow(array $seg): ?array
+    public function flowBounds(Request $request)
     {
-        $coords = $seg['coordinates']['coordinate'] ?? [];
+        $validated = $request->validate([
+            'lat_min' => ['required', 'numeric', 'between:-90,90'],
+            'lng_min' => ['required', 'numeric', 'between:-180,180'],
+            'lat_max' => ['required', 'numeric', 'between:-90,90'],
+            'lng_max' => ['required', 'numeric', 'between:-180,180'],
+            'zoom'    => ['required', 'integer', 'between:1,20'],
+        ]);
 
-        if (count($coords) < 2) {
-            return null;
+        if (! $this->traffic->enabled()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'TOMMTOM_API_KEY belum diatur.',
+            ], 503);
         }
 
-        $points = array_map(
-            fn ($c) => [(float) $c['latitude'], (float) $c['longitude']],
-            $coords
-        );
+        $latMin = (float) $validated['lat_min'];
+        $lngMin = (float) $validated['lng_min'];
+        $latMax = (float) $validated['lat_max'];
+        $lngMax = (float) $validated['lng_max'];
+        $zoom   = (int) $validated['zoom'];
 
-        $currentSpeed  = (float) ($seg['currentSpeed'] ?? 0);
-        $freeFlowSpeed = (float) ($seg['freeFlowSpeed'] ?? 0);
-        $frc           = $seg['frc'] ?? '';
+        // Grid 2x2 di dalam bounds (4 titik, hemat kuota & waktu)
+        $lats = [$latMin, $latMax];
+        $lngs = [$lngMin, $lngMax];
 
-        return [
-            'points'         => $points,
-            'color'          => $this->flowToColor($currentSpeed, $freeFlowSpeed),
-            'currentSpeed'   => $currentSpeed,
-            'freeFlowSpeed'  => $freeFlowSpeed,
-            'frc'            => $frc,
-        ];
-    }
+        $segments = [];
+        $seen = [];
 
-    /**
-     * Warna berdasarkan perbandingan kecepatan aktual vs free-flow (kemacetan).
-     */
-    protected function flowToColor(float $current, float $free): string
-    {
-        if ($free <= 0) {
-            return '#16a34a';
+        foreach ($lats as $lat) {
+            foreach ($lngs as $lng) {
+                $seg = $this->traffic->flowSegmentAt($lat, $lng);
+                if (! $seg) continue;
+
+                $mid = $seg['midpoint'];
+                $key = round($mid[0], 4) . ',' . round($mid[1], 4);
+                if (isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $segments[] = $seg;
+
+                if (count($segments) >= 20) break 2;
+            }
         }
 
-        $ratio = $current / $free;
-
-        if ($ratio < 0.4) {
-            return '#e60000'; // macet total
-        }
-        if ($ratio < 0.7) {
-            return '#e6b800'; // padat
-        }
-        if ($ratio < 0.9) {
-            return '#60a5fa'; // ramai
-        }
-
-        return '#16a34a'; // lancar
+        return response()->json([
+            'status' => 'ok',
+            'segments' => $segments,
+        ]);
     }
 }

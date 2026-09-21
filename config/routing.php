@@ -38,6 +38,15 @@ return [
             'timeout' => (int) env('OSRM_PUBLIC_TIMEOUT', 15),
         ],
 
+        // TomTom Routing API: satu-satunya mesin dengan data kemacetan real-time
+        // di paket gratis (traffic=true). Dipakai saat "Hindari Kemacetan Parah".
+        'tomtom' => [
+            'enabled' => (bool) env('TOMMTOM_ENABLED', true),
+            'url' => rtrim(env('TOMMTOM_URL', 'https://api.tomtom.com/routing/1'), '/'),
+            'timeout' => (int) env('TOMMTOM_TIMEOUT', 20),
+            'api_key' => env('TOMMTOM_API_KEY'),
+        ],
+
     ],
 
     /*
@@ -96,9 +105,11 @@ return [
             'label' => 'Bis',
             'icon' => '🚌',
             // Paket GraphHopper gratis hanya menyediakan car/bike/foot.
-            // Batasan tinggi/berat ditangani via custom_model max_height.
+            // Kendaraan berat: rute dijauhkan dari jalan kecil via custom_model
+            // (road_class residential/service/track), + batasan max_height.
             'graphhopper' => 'car',
             'osrm' => 'driving',
+            'heavy' => true,
             'max_height' => 4.0,
             'max_weight' => 15,
         ],
@@ -107,6 +118,7 @@ return [
             'icon' => '🚚',
             'graphhopper' => 'car',
             'osrm' => 'driving',
+            'heavy' => true,
             'max_height' => 3.5,
             'max_weight' => 8,
         ],
@@ -115,6 +127,7 @@ return [
             'icon' => '🚛',
             'graphhopper' => 'car',
             'osrm' => 'driving',
+            'heavy' => true,
             'max_height' => 4.2,
             'max_weight' => 20,
         ],

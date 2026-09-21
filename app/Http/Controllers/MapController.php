@@ -16,6 +16,8 @@ class MapController extends Controller
 
         $locations = Location::query()
             ->with('category')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -35,7 +37,9 @@ class MapController extends Controller
 
     public function show(Location $location): View
     {
-        $locations = Location::whereKeyNot($location->getKey())->orderBy('name')->get();
+        $locations = Location::whereKeyNot($location->getKey())
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->orderBy('name')->get();
 
         $nearest = Location::with('category')
             ->whereKeyNot($location->getKey())

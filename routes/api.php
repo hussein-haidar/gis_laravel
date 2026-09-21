@@ -19,7 +19,9 @@ Route::prefix('v1')->name('api.')->group(function () {
     Route::post('routing/route', [RoutingController::class, 'route'])->name('routing.route');
 
     // Traffic real-time (proxy) - supaya API key tidak bocor ke browser
-    Route::get('traffic/flow', [\App\Http\Controllers\Api\TomTomController::class, 'flow'])->name('traffic.flow');
+Route::get('traffic/flow', [\App\Http\Controllers\Api\TomTomController::class, 'flow'])->name('traffic.flow');
+Route::post('traffic/flow-along', [\App\Http\Controllers\Api\TomTomController::class, 'flowAlong'])->name('traffic.flow-along');
+Route::post('traffic/flow-bounds', [\App\Http\Controllers\Api\TomTomController::class, 'flowBounds'])->name('traffic.flow-bounds');
 
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/{category}', [CategoryController::class, 'show'])->name('categories.show');

@@ -33,7 +33,21 @@ class RoutingService
         $vehicle = array_key_exists($vehicle, $this->vehicles()) ? $vehicle : 'mobil';
         $options['vehicle'] = $vehicle;
 
-        foreach (config('routing.chain', []) as $engineKey) {
+        // Boleh memaksa mesin tertentu (mis. "osrm_public" untuk rute alternatif).
+        $explicitEngine = $options['engine'] ?? null;
+        $chain = $explicitEngine !== null && array_key_exists($explicitEngine, config('routing.engines', []))
+            ? [$explicitEngine]
+            : config('routing.chain', []);
+
+// "Hindari Kemacetan Parah" → pakai TomTom (satu-satunya mesin dengan data
+// kemacetan real-time di paket gratis) di urutan pertama. Bila TomTom gagal,
+// mesin berikutnya di chain tetap jadi fallback. GraphHopper gratis tanpa traffic.
+        if (! empty($options['avoid_traffic']) && $explicitEngine === null
+            && $this->engineEnabled('tomtom') && $this->engineSupportsVehicle('tomtom', $vehicle)) {
+            $chain = array_values(array_unique(array_merge(['tomtom'], $chain)));
+        }
+
+        foreach ($chain as $engineKey) {
             if (! $this->engineEnabled($engineKey)) {
                 continue;
             }
@@ -43,7 +57,15 @@ class RoutingService
             }
 
             try {
-                $result = $this->{'routeVia' . ucfirst($engineKey === 'osrm_local' ? 'Osrm' : ($engineKey === 'graphhopper' ? 'Graphhopper' : 'OsrmPublic'))}(
+                $method = match ($engineKey) {
+                    'osrm_local' => 'Osrm',
+                    'graphhopper' => 'Graphhopper',
+                    'osrm_public' => 'OsrmPublic',
+                    'tomtom' => 'Tomtom',
+                    default => 'Osrm',
+                };
+
+                $result = $this->{'routeVia' . $method}(
                     $origin,
                     $destination,
                     $options
@@ -120,6 +142,8 @@ class RoutingService
             'osrm_local' => in_array($vehicle, ['mobil', 'motor'], true),
             'graphhopper' => true,
             'osrm_public' => ! $heavy,
+            // TomTom: semua kendaraan jalan (sepeda tetap pakai mesin lain).
+            'tomtom' => ! in_array($vehicle, ['sepeda'], true),
             default => true,
         };
     }
@@ -211,6 +235,11 @@ class RoutingService
             $query['exclude'] = 'toll';
         }
 
+        // Minta hingga beberapa rute alternatif (untuk "alihkan rute" saat macet).
+        if (! empty($options['alternatives'])) {
+            $query['alternatives'] = 'true';
+        }
+
         $url = "{$baseUrl}/route/v1/{$profile}/{$coords}";
 
         $response = Http::timeout($engine['timeout'] ?? 15)
@@ -227,13 +256,6 @@ class RoutingService
             return $this->error('Rute tidak ditemukan oleh OSRM.');
         }
 
-        $route = $data['routes'][0];
-
-        $geometry = null;
-        if (! empty($route['geometry']['coordinates'])) {
-            $geometry = array_map(fn ($c) => [(float) $c[1], (float) $c[0]], $route['geometry']['coordinates']);
-        }
-
         $warnings = [];
         $vehicleCapacity = $this->vehicleMaxHeight($options['vehicle'], $options) ?? false;
         if ($vehicleCapacity && ! empty($options['avoid_low_bridge'])) {
@@ -244,15 +266,33 @@ class RoutingService
             $warnings[] = 'Profil truk/bis offline menggunakan rute mobil tanpa batasan tinggi/berat. Untuk akurasi penuh, gunakan GraphHopper.';
         }
 
-        return [
-            'status' => 'ok',
-            'message' => 'OK',
-            'distance_m' => (float) $route['distance'],
-            'duration_s' => (float) $route['duration'],
-            'geometry' => $geometry,
-            'instructions' => $this->extractOsrmSteps($route),
-            'warnings' => $warnings,
-        ];
+        $toSummary = function (array $r) use ($warnings): array {
+            $geometry = null;
+            if (! empty($r['geometry']['coordinates'])) {
+                $geometry = array_map(fn ($c) => [(float) $c[1], (float) $c[0]], $r['geometry']['coordinates']);
+            }
+
+            return [
+                'status' => 'ok',
+                'message' => 'OK',
+                'distance_m' => (float) ($r['distance'] ?? 0),
+                'duration_s' => (float) ($r['duration'] ?? 0),
+                'geometry' => $geometry,
+                'instructions' => $this->extractOsrmSteps($r),
+                'warnings' => $warnings,
+            ];
+        };
+
+        $summaries = array_map($toSummary, array_slice($data['routes'] ?? [$data['routes'][0]], 0, 4));
+        $result = $summaries[0];
+
+        // Serahkan daftar rute (utama + alternatif) ke frontend untuk dipilih
+        // saat kemacetan parah terdeteksi di rute utama.
+        if (! empty($options['alternatives'])) {
+            $result['routes'] = $summaries;
+        }
+
+        return $result;
     }
 
     protected function shouldProvideSteps(array $options): bool
@@ -266,11 +306,15 @@ class RoutingService
 
         foreach ($route['legs'] ?? [] as $leg) {
             foreach ($leg['steps'] ?? [] as $step) {
+                $location = $step['maneuver']['location'] ?? null;
                 $steps[] = [
                     'maneuver' => $step['maneuver']['type'] ?? '',
                     'instruction' => $step['name'] ?? '',
                     'distance_m' => (float) ($step['distance'] ?? 0),
                     'duration_s' => (float) ($step['duration'] ?? 0),
+                    'location' => is_array($location) && count($location) >= 2
+                        ? [(float) $location[1], (float) $location[0]]
+                        : null,
                 ];
             }
         }
@@ -359,10 +403,6 @@ class RoutingService
             }
         }
 
-        if (! empty($options['avoid_traffic']) && empty($trafficSpeed)) {
-            $warnings[] = 'Data kemacetan real-time tidak aktif (butuh GraphHopper premium). Berlaku heuristik jam sibuk.';
-        }
-
         return [
             'status' => 'ok',
             'message' => 'OK',
@@ -374,11 +414,175 @@ class RoutingService
         ];
     }
 
+    #region Engine: TomTom (routing dengan kemacetan real-time)
+
+    /**
+     * Rute sadar-kemacetan: traffic=true (data real-time TomTom di paket gratis).
+     * Truk/bis memakai mode komersial (vehicleHeight/vehicleWeight) sehingga
+     * jembatan rendah & batas berat ikut dihindari mesin.
+     */
+    protected function routeViaTomtom(array $origin, array $destination, array $options): array
+    {
+        $engine = config('routing.engines.tomtom', []);
+        $apiKey = $engine['api_key'] ?? config('services.tomtom.key') ?? '';
+
+        if (empty($apiKey)) {
+            return $this->error('TomTom API key kosong.');
+        }
+
+        $vehicleMap = [
+            'mobil' => 'car',
+            'motor' => 'car',
+            'bis' => 'bus',
+            'truk_sedang' => 'truck',
+            'truk_besar' => 'truck',
+        ];
+        $ttVehicle = $vehicleMap[$options['vehicle']] ?? 'car';
+
+        $maxHeight = $this->vehicleMaxHeight($options['vehicle'], $options);
+        $maxWeight = config("routing.vehicles.{$options['vehicle']}.max_weight");
+
+        $avoid = ['unpavedRoads'];
+        if (! empty($options['avoid_toll'])) {
+            $avoid[] = 'tollRoads';
+        }
+
+        $query = [
+            'key' => $apiKey,
+            'traffic' => 'true',
+            'routeType' => 'fastest',
+            'computeTravelTimeFor' => 'all',
+            'language' => 'id-ID',
+            'instructionsType' => 'tagged',
+            'avoid' => array_unique($avoid),
+            'travelMode' => $ttVehicle,
+        ];
+
+        if (in_array($ttVehicle, ['truck', 'bus'], true)) {
+            if ($maxHeight) {
+                $query['vehicleHeight'] = (float) $maxHeight;
+            }
+            if ($maxWeight) {
+                $query['vehicleWeight'] = (float) $maxWeight;
+            }
+        }
+
+        $via = "{$origin[0]},{$origin[1]}:{$destination[0]},{$destination[1]}";
+        $url = "{$engine['url']}/calculateRoute/{$via}/json";
+
+        // Parameter berulang (mis. avoid=a&avoid=b) harus dibangun manual,
+        // karena Guzzle meng-encode array menjadi avoid[0]=a&avoid[1]=b (ditolak TomTom).
+        $parts = [];
+        foreach ($query as $k => $v) {
+            foreach ((array) $v as $val) {
+                $parts[] = $k . '=' . urlencode((string) $val);
+            }
+        }
+        $url .= '?' . implode('&', $parts);
+
+        $response = Http::timeout($engine['timeout'] ?? 20)
+            ->withOptions(['verify' => false])
+            ->get($url);
+
+        if (! $response->successful()) {
+            return $this->error("TomTom HTTP {$response->status()}.");
+        }
+
+        $route = $response->json('routes.0');
+
+        if (empty($route)) {
+            return $this->error('Rute tidak ditemukan oleh TomTom.');
+        }
+
+        $geometry = array_map(
+            fn ($p) => [(float) $p['latitude'], (float) $p['longitude']],
+            $route['geometry']['points'] ?? []
+        );
+
+        $summary = $route['summary'] ?? [];
+
+        return [
+            'status' => 'ok',
+            'message' => 'OK',
+            'distance_m' => (float) ($summary['lengthInMeters'] ?? 0),
+            'duration_s' => (float) ($summary['travelTimeInSeconds'] ?? 0),
+            'geometry' => $geometry,
+            'instructions' => $this->tomtomInstructions($route['guidance']['instructions'] ?? []),
+            'warnings' => [],
+        ];
+    }
+
+    protected function tomtomInstructions(array $raw): array
+    {
+        $out = [];
+
+        foreach ($raw as $idx => $step) {
+            $offset = (float) ($step['routeOffsetInMeters'] ?? 0);
+            $nextOffset = isset($raw[$idx + 1]) ? (float) ($raw[$idx + 1]['routeOffsetInMeters'] ?? $offset) : null;
+            $dist = $nextOffset !== null ? max(0, $nextOffset - $offset) : 0;
+            $loc = $step['maneuverPoint']['location'] ?? null;
+            $maneuver = $this->tomtomManeuver((string) ($step['instructionType'] ?? 'continue'));
+
+            $out[] = [
+                'type' => $maneuver,
+                'maneuver' => $maneuver,
+                'name' => (string) ($step['street'] ?? ''),
+                'instruction' => (string) ($step['message'] ?? ''),
+                'distance' => $dist,
+                'distance_m' => $dist,
+                'duration' => 0,
+                'location' => $loc ? [(float) $loc['latitude'], (float) $loc['longitude']] : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    protected function tomtomManeuver(string $type): string
+    {
+        return (string) ($this->tomtomManeuvers[$type] ?? 'continue');
+    }
+
+    protected array $tomtomManeuvers = [
+        'DEPART' => 'depart',
+        'ARRIVE' => 'arrive',
+        'CONTINUE' => 'continue',
+        'TURN_LEFT' => 'turn left',
+        'TURN_RIGHT' => 'turn right',
+        'TURN_SLIGHT_LEFT' => 'turn slight left',
+        'TURN_SLIGHT_RIGHT' => 'turn slight right',
+        'TURN_SHARP_LEFT' => 'turn sharp left',
+        'TURN_SHARP_RIGHT' => 'turn sharp right',
+        'UTURN' => 'uturn',
+        'MERGE' => 'merge',
+        'KEEP_LEFT' => 'turn slight left',
+        'KEEP_RIGHT' => 'turn slight right',
+        'ROUNDABOUT_LEFT' => 'roundabout',
+        'ROUNDABOUT_RIGHT' => 'roundabout',
+        'ROUNDABOUT_EXIT_LEFT' => 'roundabout',
+        'ROUNDABOUT_EXIT_RIGHT' => 'roundabout',
+        'ROUNDABOUT_UTURN' => 'roundabout',
+        'FORK_LEFT' => 'fork',
+        'FORK_RIGHT' => 'fork',
+        'END_OF_ROAD_LEFT' => 'end of road',
+        'END_OF_ROAD_RIGHT' => 'end of road',
+        'END_OF_ROAD' => 'end of road',
+        'EXIT_LEFT' => 'turn left',
+        'EXIT_RIGHT' => 'turn right',
+        'ON_RAMP_LEFT' => 'on ramp',
+        'ON_RAMP_RIGHT' => 'on ramp',
+        'OFF_RAMP_LEFT' => 'off ramp',
+        'OFF_RAMP_RIGHT' => 'off ramp',
+    ];
+
+    #endregion
+
     protected function buildCustomModel(array $options, ?float $maxHeight, array &$warnings): array
     {
         $model = ['priority' => []];
+        $vehicle = $options['vehicle'] ?? 'mobil';
 
-        // Hindari tol.
+        // Hindari tol (hanya saat pengguna meminta).
         if (! empty($options['avoid_toll'])) {
             $model['priority'][] = [
                 'if' => 'get("toll") == "yes" || get("toll") == 1',
@@ -386,23 +590,24 @@ class RoutingService
             ];
         }
 
-        // Hindari jembatan rendah: kurangi priority jalan dengan max_height rendah.
+        // Kendaraan berat (bis/truk): jauhkan dari jalan kecil yang hanya layak
+        // dilalui mobil/motor (gang, jalan lingkungan, jalan khusus pejalan kaki).
+        $cfg = $this->vehicles()[$vehicle] ?? [];
+        if (! empty($cfg['heavy'])) {
+            $model['priority'][] = [
+                'if' => 'road_class == RESIDENTIAL || road_class == SERVICE || road_class == TRACK || road_class == LIVING_STREET || road_class == PATH',
+                'multiply_by' => '0.02',
+            ];
+            $warnings[] = 'Rute ' . ($cfg['label'] ?? 'kendaraan') . ' dijauhkan dari jalan lingkungan/gang (hanya jalan utama).';
+        }
+
+        // Hindari jembatan rendah: hanya kendaraan dengan max_height (> truk & bis).
         if (! empty($options['avoid_low_bridge']) && $maxHeight) {
             $threshold = $maxHeight + (float) config('routing.low_bridge_margin', 0.3);
             $model['priority'][] = [
                 'if' => sprintf('max_height > 0 && max_height < %.2f', $threshold),
                 'multiply_by' => '0.05',
             ];
-        }
-
-        // Hindari kemacetan (heuristik): kurangi priority arteri/tol saat jam sibuk.
-        if (! empty($options['avoid_traffic'])) {
-            $traffic = $this->detectTraffic();
-            if ($traffic['rush_hour']) {
-                $model['priority'][] = ['if' => 'road_class == PRIMARY', 'multiply_by' => '0.7'];
-                $model['priority'][] = ['if' => 'road_class == SECONDARY', 'multiply_by' => '0.85'];
-                $model['priority'][] = ['if' => 'road_class == MOTORWAY', 'multiply_by' => '0.6'];
-            }
         }
 
         if (empty($model['priority'])) {
@@ -440,12 +645,19 @@ class RoutingService
     {
         $steps = [];
 
+        $coords = array_map(
+            fn ($c) => [(float) $c[1], (float) $c[0]],
+            $path['points']['coordinates'] ?? []
+        );
+
         foreach ($path['instructions'] ?? [] as $instr) {
+            $idx = $instr['interval'][0] ?? null;
             $steps[] = [
                 'maneuver' => $instr['sign'] ?? '',
                 'instruction' => $instr['text'] ?? '',
                 'distance_m' => (float) ($instr['distance'] ?? 0),
                 'duration_s' => (float) ($instr['time'] ?? 0) / 1000,
+                'location' => ($idx !== null && isset($coords[$idx])) ? $coords[$idx] : null,
             ];
         }
 
