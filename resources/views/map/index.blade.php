@@ -525,17 +525,19 @@
         // Muat data untuk area/viewport saat ini; ulangi saat peta digerakkan
         // agar garis kemacetan LIVE mengikuti seluruh daerah yang sedang dilihat.
         function loadCongestionForBounds() {
+            const zoom = map.getZoom();
+            if (zoom < 10) return; // TomTom flow butuh zoom >= 10
             const bounds = map.getBounds();
-            const key = bounds.getSouth().toFixed(3) + ',' + bounds.getWest().toFixed(3) + ',' +
-                        bounds.getNorth().toFixed(3) + ',' + bounds.getEast().toFixed(3);
+            const key = bounds.getSouth().toFixed(4) + ',' + bounds.getWest().toFixed(4) + ',' +
+                        bounds.getNorth().toFixed(4) + ',' + bounds.getEast().toFixed(4);
             const now = Date.now();
-            // Throttle 5 dtk global, tapi bypass jika bounds berubah signifikan
-            if (now - congestionRefreshAt < 5000 && key === lastBoundsKey) return;
+            // Throttle 2 dtk untuk bounds yg SAMA; bounds beda = load instan
+            if (now - congestionRefreshAt < 2000 && key === lastBoundsKey) return;
             congestionRefreshAt = now;
             lastBoundsKey = key;
 
             const c = map.getCenter();
-            loadTomTomTraffic(c.lat, c.lng, map.getZoom());
+            loadTomTomTraffic(c.lat, c.lng, zoom);
         }
 
         Object.keys(categoryClusters).forEach(function (key) {
