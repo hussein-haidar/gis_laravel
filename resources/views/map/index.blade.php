@@ -803,6 +803,9 @@
             if (e.key === 'Enter') document.getElementById('btn-geocode-search').click();
         });
 
+        // Autocomplete untuk Cari Alamat — sama seperti Lokasi Tujuan
+        attachRouteAutocomplete('geocode-input', 'destination');
+
         map.on('contextmenu', function (e) {
             geocoder.reverse(e.latlng, map.options.crs.scale(map.getZoom()), function (results) {
                 if (results && results.length > 0) {
