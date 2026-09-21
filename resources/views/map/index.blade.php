@@ -175,11 +175,10 @@
             <h6 class="mb-2">Cari Alamat / Geocoding</h6>
             <div class="input-group input-group-sm mb-2">
                 <input type="text" id="geocode-input" class="form-control" placeholder="Ketik alamat atau tempat...">
-                <button class="btn btn-primary" id="btn-geocode-search">Cari</button>
-            </div>
-            <div id="geocode-results" style="max-height:200px;overflow-y:auto;"></div>
-            <hr class="my-1">
-            <div class="small text-muted">Reverse geocoding: klik kanan pada peta untuk lihat alamat.</div>
+<button class="btn btn-primary" id="btn-geocode-search">Cari</button>
+        </div>
+<div id="geocode-results" style="max-height:200px;overflow-y:auto;"></div>
+        <hr class="my-1">
         </div>
     </div>
 
@@ -564,7 +563,7 @@
             ['#a4c3d3', 'Lancar']
         ];
 
-        const legend = L.control({ position: 'bottomleft' });
+        const legend = L.control({ position: 'bottomright' });
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'map-legend');
             div.innerHTML = '<strong>Kategori</strong><br>' + legendItems.join('<br>')
