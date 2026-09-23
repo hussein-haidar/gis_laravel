@@ -18,7 +18,7 @@ class Location extends Model
         'geometry',
     ];
 
-    protected $appends = ['photo_url'];
+    protected $appends = ['photo_url', 'photo_display'];
 
     protected $casts = [
         'geometry' => 'array',
@@ -29,14 +29,54 @@ class Location extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function photos(): HasMany
+    {
+        return $this->hasMany(LocationPhoto::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function primaryPhoto(): HasMany
+    {
+        return $this->hasMany(LocationPhoto::class)->where('is_primary', true);
+    }
+
     public function activityLogs(): HasMany
     {
         return $this->morphMany(ActivityLog::class, 'subject');
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class)->latest();
+    }
+
+    public function approvedReviews(): HasMany
+    {
+        return $this->hasMany(Review::class)->approved()->latest();
+    }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    public function getAvgRatingAttribute(): float
+    {
+        return round($this->approvedReviewsAvg ?? $this->approvedReviews()->avg('rating') ?? 0, 1);
+    }
+
+    public function getRatingCountAttribute(): int
+    {
+        return $this->approvedReviews()->count();
+    }
+
     public function getPhotoUrlAttribute(): ?string
     {
         return $this->photo ? asset('storage/' . $this->photo) : null;
+    }
+
+    public function getPhotoDisplayAttribute(): string
+    {
+        return $this->photo_url ?? route('placeholder.show', $this);
     }
 
     public function getGeoJsonGeometryAttribute(): array

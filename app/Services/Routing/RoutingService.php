@@ -2,6 +2,7 @@
 
 namespace App\Services\Routing;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -111,18 +112,28 @@ class RoutingService
 
     protected function engineEnabled(string $key): bool
     {
-        $engine = config("routing.engines.{$key}");
+        $settingKey = match ($key) {
+            'osrm_local' => 'osrm_local_enabled',
+            'graphhopper' => 'graphhopper_enabled',
+            'osrm_public' => 'osrm_public_enabled',
+            'tomtom' => 'tomtom_api_key', // TomTom enabled if API key exists
+            default => null,
+        };
 
-        if (! $engine || empty($engine['enabled'])) {
-            return false;
-        }
-
-        if ($key === 'osrm_public') {
-            return true;
+        if ($key === 'tomtom') {
+            return !empty(Setting::getValue('tomtom_api_key'));
         }
 
         if ($key === 'graphhopper') {
-            return ! empty(config('routing.engines.graphhopper.api_key'));
+            return (bool) Setting::getValue('graphhopper_enabled', false) && !empty(Setting::getValue('graphhopper_api_key'));
+        }
+
+        if ($key === 'osrm_local') {
+            return (bool) Setting::getValue('osrm_local_enabled', false);
+        }
+
+        if ($key === 'osrm_public') {
+            return (bool) Setting::getValue('osrm_public_enabled', true);
         }
 
         return true;

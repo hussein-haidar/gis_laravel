@@ -15,7 +15,10 @@ class LocationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Location::with('category');
+        $query = Location::with('category')
+            ->whereHas('category', function ($q) {
+                $q->where('is_active', true);
+            });
 
         if ($request->search) {
             $search = $request->search;

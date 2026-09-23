@@ -232,7 +232,7 @@
 @section('content')
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ route('map.index') }}">Peta</a></li>
+            <li class="breadcrumb-item"><a href="{{ route('map.index') }}">{{ __('messages.map') }}</a></li>
             <li class="breadcrumb-item active">{{ $location->name }}</li>
         </ol>
     </nav>
@@ -241,13 +241,18 @@
         <div class="col-lg-7">
             <div class="card h-100">
                 <div class="card-body">
-                    @if ($location->photo)
-                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" class="detail-photo mb-3">
-                    @else
-                        <div class="d-flex align-items-center justify-content-center text-muted detail-photo mb-3" style="height:260px;background:#f1f5f9;">Tidak ada foto</div>
-                    @endif
+                    <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" class="detail-photo mb-3">
 
-                    <h1 class="h3 mb-2">{{ $location->name }}</h1>
+                    <h1 class="h3 mb-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        {{ $location->name }}
+                        @auth
+                            <button type="button" id="btn-favorite"
+                                    class="btn btn-{{ $isFavorite ? 'danger' : 'outline-danger' }} btn-sm"
+                                    data-url="{{ route('favorites.toggle', $location) }}">
+                                {{ $isFavorite ? '♥' : '♡' }} {{ $isFavorite ? __('messages.favorite') : __('messages.save_favorite') }}
+                            </button>
+                        @endauth
+                    </h1>
 
                     @if ($location->category)
                         <span class="badge text-white mb-3" style="background:{{ $location->category->color }}">{{ $location->category->name }}</span>
@@ -259,33 +264,124 @@
 
                     <div class="row g-3 mt-1">
                         <div class="col-sm-6">
-                            <div class="info-label">Latitude</div>
+                            <div class="info-label">{{ __('messages.latitude') }}</div>
                             <div class="fw-semibold">{{ $location->latitude }}</div>
                         </div>
                         <div class="col-sm-6">
-                            <div class="info-label">Longitude</div>
+                            <div class="info-label">{{ __('messages.longitude') }}</div>
                             <div class="fw-semibold">{{ $location->longitude }}</div>
                         </div>
                         <div class="col-sm-6">
-                            <div class="info-label">Ditambahkan</div>
+                            <div class="info-label">{{ __('messages.added_on') }}</div>
                             <div>{{ $location->created_at->format('d M Y') }}</div>
                         </div>
                         <div class="col-sm-6">
-                            <div class="info-label">Kategori</div>
+                            <div class="info-label">{{ __('messages.category') }}</div>
                             <div>{{ $location->category?->name ?? '-' }}</div>
                         </div>
                         @if ($location->geometry)
                             <div class="col-sm-12">
-                                <div class="info-label">Tipe Geometri</div>
+                                <div class="info-label">{{ __('messages.geometry_type') }}</div>
                                 <div>{{ $location->geometry['type'] ?? '-' }}</div>
                             </div>
                         @endif
                     </div>
 
                     <div class="mt-3" id="address-display">
-                        <div class="info-label">Alamat (Reverse Geocoding)</div>
-                        <div class="text-muted small" id="reverse-addr">Memuat alamat...</div>
+                        <div class="info-label">{{ __('messages.reverse_address') }}</div>
+                        <div class="text-muted small" id="reverse-addr">{{ __('messages.loading_address') }}</div>
                     </div>
+
+                    @if ($ratingCount > 0)
+                        <div class="mt-4 border-top pt-3 d-flex align-items-center gap-3">
+                            <div class="text-center">
+                                <div class="fs-2 fw-bold text-warning">{{ number_format((float) $avgRating, 1, ',', '.') }}</div>
+                                <div class="small">{{ __('messages.review_count', ['count' => $ratingCount]) }}</div>
+                            </div>
+                            <div>
+                                <div class="fs-5 text-warning" aria-label="Rating {{ round($avgRating) }} dari 5">
+                                    @for ($i = 1; $i <= 5; $i++)
+                                        <span>{{ $i <= round($avgRating) ? '★' : '☆' }}</span>
+                                    @endfor
+                                </div>
+                                <div class="small text-muted">{{ __('messages.review_avg_from_visitors') }}</div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Ulasan & Rating --}}
+            <div class="card mt-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
+                    <span class="badge bg-secondary">{{ $reviews->count() }}</span>
+                </div>
+                <div class="card-body">
+                    @if ($reviews->isEmpty())
+                        <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
+                    @else
+                        <div class="mb-4">
+                            @foreach ($reviews as $review)
+                                <div class="border-bottom py-2">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <span class="text-warning small">
+                                                @for ($i = 1; $i <= 5; $i++)
+                                                    {{ $i <= $review->rating ? '★' : '☆' }}
+                                                @endfor
+                                            </span>
+                                            <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
+                                        </div>
+                                        <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
+                                    </div>
+                                    @if ($review->title)
+                                        <div class="fw-semibold mt-1">{{ $review->title }}</div>
+                                    @endif
+                                    @if ($review->comment)
+                                        <div class="small text-muted mt-1">{{ $review->comment }}</div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @auth
+                        @if ($userReview && $userReview->status === 'pending')
+                            <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
+                        @endif
+                        <form action="{{ route('reviews.store', $location) }}" method="POST">
+                            @csrf
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold">Rating Anda</label>
+                                <div class="star-input d-flex" data-stars="5">
+                                    @for ($i = 1; $i <= 5; $i++)
+                                        <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
+                                                data-value="{{ $i }}" style="color:#d1d5db;">★</button>
+                                    @endfor
+                                    <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
+                                </div>
+                                @error('rating')
+                                    <div class="text-danger small">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="mb-2">
+                                <input type="text" name="title" class="form-control form-control-sm"
+                                       placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
+                            </div>
+                            <div class="mb-2">
+                                <textarea name="comment" rows="3" class="form-control form-control-sm"
+                                          placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
+                            </button>
+                        </form>
+                    @else
+                        <div class="text-muted small">
+                            <a href="{{ route('login') }}">{{ __('messages.nav_login') }}</a> {{ __('messages.login_to_review') }}
+                        </div>
+                    @endauth
                 </div>
             </div>
         </div>
@@ -293,17 +389,17 @@
         <div class="col-lg-5">
             <div class="card mb-3" id="map-card" style="position:relative;">
                 <div class="nav-overlay" id="nav-overlay">
-                    <button class="nav-close" id="nav-close-btn" title="Hentikan navigasi">&times;</button>
+                    <button class="nav-close" id="nav-close-btn" title="{{ __('messages.stop_navigation') }}">&times;</button>
                     <div class="nav-step-text" id="nav-step-text">--</div>
                     <div class="nav-step-detail" id="nav-step-detail"></div>
                     <div class="nav-remaining" id="nav-remaining"></div>
                 </div>
                 <div class="card-body">
                     <div class="d-none-fullscreen">
-                        <h2 class="h5 mb-3">Lokasi di Peta</h2>
+                        <h2 class="h5 mb-3">{{ __('messages.location_on_map') }}</h2>
                     </div>
                     <div id="map"></div>
-                    <div class="layer-badge" id="traffic-badge">⚠️ Kemacetan: Memuat...</div>
+                    <div class="layer-badge" id="traffic-badge">⚠️ {{ __('messages.congestion_loading') }}</div>
 
                     <div class="fs-nav-panel">
                         <div class="d-flex align-items-center justify-content-between mb-2 fs-nav-head">
@@ -311,7 +407,7 @@
                                 <div class="fw-bold" id="fs-nav-title" style="font-size:1.15rem;">--</div>
                                 <div class="small text-muted" id="fs-nav-sub"></div>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" id="btn-exit-fullscreen">&times; Selesai</button>
+                            <button class="btn btn-sm btn-outline-danger" id="btn-exit-fullscreen">&times; {{ __('messages.done') }}</button>
                         </div>
                         <div class="fs-nav-steps list-group list-group-flush" id="fs-nav-steps"></div>
                     </div>
@@ -321,11 +417,11 @@
                     <div class="d-flex align-items-start gap-3">
                         <div class="rp-icon">⚠️</div>
                         <div class="flex-grow-1">
-                            <div class="rp-title">Rute di depan macet!</div>
+                            <div class="rp-title">{{ __('messages.reroute_title') }}</div>
                             <div class="small text-muted" id="reroute-info"></div>
                             <div class="d-flex gap-2 mt-3">
-                                <button type="button" class="btn btn-sm btn-warning flex-fill" id="btn-reroute-now">🛣️ Alihkan Rute</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" id="btn-reroute-skip">Lewati</button>
+                                <button type="button" class="btn btn-sm btn-warning flex-fill" id="btn-reroute-now">🛣️ {{ __('messages.reroute_now') }}</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" id="btn-reroute-skip">{{ __('messages.reroute_skip') }}</button>
                             </div>
                         </div>
                     </div>
@@ -333,10 +429,10 @@
             </div>
 
             <div class="card">
-                <div class="card-header">Rute ke Lokasi Ini</div>
+                <div class="card-header">{{ __('messages.route_to_this_location') }}</div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <div class="info-label mb-1">Jenis Kendaraan</div>
+                        <div class="info-label mb-1">{{ __('messages.vehicle_type') }}</div>
                         <div class="vehicle-picker d-flex flex-wrap gap-2" id="vehicle-picker">
                             <button type="button" class="vehicle-btn active" data-vehicle="mobil" data-icon="🚗" title="Mobil">🚗</button>
                             <button type="button" class="vehicle-btn" data-vehicle="motor" data-icon="🏍️" title="Motor">🏍️</button>
@@ -348,15 +444,15 @@
                         <div class="text-muted small mt-1" id="vehicle-label">Mobil</div>
                     </div>
                     <select id="route-from-detail" class="form-select form-select-sm mb-2">
-                        <option value="">-- Pilih Lokasi Asal --</option>
-                        <option value="gps">📍 Lokasi Saya (GPS)</option>
+                        <option value="">{{ __('messages.choose_origin') }}</option>
+                        <option value="gps">{{ __('messages.my_position_gps') }}</option>
                         @foreach ($locations as $loc)
                             @if ($loc->id !== $location->id)
                                 <option value="{{ $loc->latitude }},{{ $loc->longitude }}">{{ $loc->name }}</option>
                             @endif
                         @endforeach
                     </select>
-                    <button class="btn btn-sm btn-primary w-100" id="btn-route-detail">▶ Mulai Navigasi</button>
+                    <button class="btn btn-sm btn-primary w-100" id="btn-route-detail">▶ {{ __('messages.start_navigation') }}</button>
                     <div id="route-detail-info" class="mt-2 small"></div>
                     <div id="route-steps" class="mt-2" style="max-height:280px;overflow-y:auto;display:none;"></div>
                 </div>
@@ -365,15 +461,15 @@
             <div class="card mt-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span class="d-flex align-items-center">
-                        <span>Daftar Jalan Macet</span>
+                        <span>{{ __('messages.traffic_list_title') }}</span>
                         <span class="badge text-white ms-2" id="traffic-count" style="display:none;background:#6b7280;">0</span>
                     </span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-congestion-reload" title="Muat ulang data kemacetan">🔄 Muat Ulang</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-congestion-reload" title="{{ __('messages.reload') }}">🔄 {{ __('messages.reload') }}</button>
                 </div>
                 <div class="card-body">
-                    <div class="text-muted small mb-2" id="traffic-list-sub">Memuat data kemacetan...</div>
+                    <div class="text-muted small mb-2" id="traffic-list-sub">{{ __('messages.loading_traffic_list') }}</div>
                     <div id="traffic-list" style="max-height:320px;overflow-y:auto;">
-                        <div class="text-muted small">Mencari jalan & titik kemacetan di sekitar...</div>
+                        <div class="text-muted small">{{ __('messages.searching_traffic') }}</div>
                     </div>
                 </div>
             </div>
@@ -382,7 +478,7 @@
 
     @if ($nearest->isNotEmpty())
         <div class="mt-4">
-            <h2 class="h5 mb-3">Lokasi Terdekat</h2>
+            <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
                 @foreach ($nearest as $item)
                     <div class="col">
@@ -825,7 +921,6 @@
             trafficOverlays,
             { position: 'topright' }
         ).addTo(map);
-        L.control.scale({ imperial: false }).addTo(map);
 
         const icon = L.divIcon({
             className: 'custom-marker',
@@ -1253,6 +1348,53 @@
                 doRoute(fromVal.split(',').map(Number));
             }
         });
+
+// Star rating input
+        const starInput = document.querySelector('.star-input');
+        if (starInput) {
+            const starButtons = starInput.querySelectorAll('.star-btn');
+            const ratingInput = starInput.querySelector('input[name="rating"]');
+            function paintStars(value) {
+                starButtons.forEach(function (b) {
+                    b.style.color = parseInt(b.dataset.value) <= value ? '#f59e0b' : '#d1d5db';
+                });
+            }
+            starButtons.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    ratingInput.value = this.dataset.value;
+                    paintStars(parseInt(this.dataset.value));
+                });
+                btn.addEventListener('mouseenter', function () { paintStars(parseInt(this.dataset.value)); });
+            });
+            starInput.addEventListener('mouseleave', function () { paintStars(parseInt(ratingInput.value)); });
+            paintStars(parseInt(ratingInput.value));
+        }
+
+        // Favorite toggle
+        const favBtn = document.getElementById('btn-favorite');
+        if (favBtn) {
+            favBtn.addEventListener('click', function () {
+                fetch(this.dataset.url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken(),
+                    },
+                }).then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.favorited) {
+                            favBtn.classList.remove('btn-outline-danger');
+                            favBtn.classList.add('btn-danger');
+                            favBtn.innerHTML = '♥ Favorit';
+                        } else {
+                            favBtn.classList.remove('btn-danger');
+                            favBtn.classList.add('btn-outline-danger');
+                            favBtn.innerHTML = '♡ Simpan Favorit';
+                        }
+                    }).catch(function () { alert('Gagal memperbarui favorit.'); });
+            });
+        }
 
         @if ($nearest->isNotEmpty())
             @php

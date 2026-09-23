@@ -18,6 +18,9 @@ class MapController extends Controller
             ->with('category')
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
+            ->whereHas('category', function ($q) {
+                $q->where('is_active', true);
+            })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -30,7 +33,7 @@ class MapController extends Controller
             ->orderBy('name')
             ->get();
 
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::active()->forPublicFilter()->ordered()->get();
 
         return view('map.index', compact('locations', 'categories', 'search', 'categoryId'));
     }
@@ -53,6 +56,12 @@ class MapController extends Controller
             ->sortBy('distance')
             ->take(4);
 
-        return view('map.show', compact('location', 'nearest', 'locations'));
+        $reviews = $location->approvedReviews()->with('user')->get();
+        $avgRating = $reviews->avg('rating');
+        $ratingCount = $reviews->count();
+        $userReview = auth()->check() ? $location->reviews()->where('user_id', auth()->id())->first() : null;
+        $isFavorite = auth()->check() ? $location->favorites()->where('user_id', auth()->id())->exists() : false;
+
+        return view('map.show', compact('location', 'nearest', 'locations', 'reviews', 'avgRating', 'ratingCount', 'userReview', 'isFavorite'));
     }
 }

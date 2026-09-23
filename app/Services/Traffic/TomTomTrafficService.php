@@ -2,6 +2,7 @@
 
 namespace App\Services\Traffic;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,13 +15,19 @@ class TomTomTrafficService
 
     public function __construct()
     {
-        $this->key = (string) config('services.tomtom.key', '');
-        $this->baseUrl = rtrim((string) config('services.tomtom.traffic_url', 'https://api.tomtom.com/traffic/services/4'), '/');
-        $this->timeout = (int) config('services.tomtom.timeout', 15);
+        $this->refreshConfig();
+    }
+
+    protected function refreshConfig(): void
+    {
+        $this->key = (string) Setting::getValue('tomtom_api_key', '');
+        $this->baseUrl = rtrim((string) Setting::getValue('tomtom_traffic_url', 'https://api.tomtom.com/traffic/services/4'), '/');
+        $this->timeout = (int) Setting::getValue('tomtom_timeout', 15);
     }
 
     public function enabled(): bool
     {
+        $this->refreshConfig();
         return $this->key !== '';
     }
 

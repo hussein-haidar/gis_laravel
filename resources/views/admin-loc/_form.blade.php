@@ -37,10 +37,10 @@
 </div>
 
 <div class="mb-3">
-    <label for="photo" class="form-label">Foto Lokasi</label>
+    <label for="photo" class="form-label">Foto Utama (Kompatibilitas)</label>
     <input type="file" name="photo" id="photo" accept="image/*"
            class="form-control @error('photo') is-invalid @enderror">
-    <div class="form-text">Format: JPG, PNG, GIF, WebP. Maksimal 5 MB.</div>
+    <div class="form-text">Format: JPG, PNG, GIF, WebP. Maksimal 5 MB. Dipakai untuk kompatibilitas lama.</div>
     @error('photo')
         <div class="invalid-feedback">{{ $message }}</div>
     @enderror
@@ -52,6 +52,50 @@
         </div>
     @else
         <img src="#" alt="Preview" id="photo-preview" style="display:none;width:160px;height:110px;object-fit:cover;border-radius:8px;" class="mt-2">
+    @endif
+</div>
+
+<div class="mb-3">
+    <label for="photos" class="form-label">Galeri Foto (Multiple)</label>
+    <input type="file" name="photos[]" id="photos" accept="image/*" multiple
+           class="form-control @error('photos.*') is-invalid @enderror">
+    <div class="form-text">Pilih multiple foto (JPG, PNG, GIF, WebP, max 5 MB per foto). Foto pertama jadi utama jika belum ada.</div>
+    @error('photos.*')
+        <div class="invalid-feedback">{{ $message }}</div>
+    @enderror
+
+    @if ($location->photos->count())
+        <div class="mt-3">
+            <label class="form-label">Foto Tersimpan ({{ $location->photos->count() }})</label>
+            <div class="row g-2" id="photo-gallery">
+                @foreach ($location->photos as $photo)
+                    <div class="col-md-3 col-sm-4 col-6 photo-item" data-id="{{ $photo->id }}">
+                        <div class="position-relative border rounded p-1">
+                            <div class="drag-handle position-absolute top-0 start-0 m-1 bg-light rounded p-1" style="cursor:grab;z-index:10;" title="Seret untuk urutkan">☰</div>
+                            <img src="{{ $photo->url }}" alt="{{ $photo->caption ?? $location->name }}"
+                                 class="img-fluid rounded" style="height:120px;object-fit:cover;">
+                            <div class="position-absolute top-0 end-0 m-1">
+                                <button type="button" class="btn btn-sm btn-danger btn-delete-photo" 
+                                        data-id="{{ $photo->id }}" title="Hapus">×</button>
+                            </div>
+                            <div class="p-1">
+                                <input type="text" name="photo_data[{{ $photo->id }}][caption]" 
+                                       class="form-control form-control-sm" 
+                                       placeholder="Keterangan" value="{{ $photo->caption }}">
+                                <input type="hidden" name="photo_data[{{ $photo->id }}][sort_order]" 
+                                       value="{{ $photo->sort_order }}">
+                                <div class="form-check form-switch mt-1">
+                                    <input type="checkbox" name="photo_data[{{ $photo->id }}][is_primary]" 
+                                           class="form-check-input" {{ $photo->is_primary ? 'checked' : '' }}>
+                                    <label class="form-check-label small">Utama</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            <input type="hidden" name="delete_photos" id="delete_photos" value="">
+        </div>
     @endif
 </div>
 
@@ -219,5 +263,56 @@
                 photoPreview.style.display = 'block';
             }
         });
+
+        // Photo Gallery JS
+        document.querySelectorAll('.btn-delete-photo').forEach(btn => {
+            btn.addEventListener('click', function () {
+                if (confirm('Hapus foto ini?')) {
+                    const id = this.dataset.id;
+                    const deleteInput = document.getElementById('delete_photos');
+                    const current = deleteInput.value ? deleteInput.value.split(',').filter(Boolean) : [];
+                    current.push(id);
+                    deleteInput.value = current.join(',');
+                    this.closest('.photo-item').remove();
+                }
+            });
+        });
+
+        // Drag & Drop reorder (simple implementation)
+        const gallery = document.getElementById('photo-gallery');
+        if (gallery) {
+            new Sortable(gallery, {
+                animation: 150,
+                handle: '.drag-handle',
+                onEnd: function (evt) {
+                    // Update sort_order inputs
+                    document.querySelectorAll('.photo-item').forEach((item, index) => {
+                        const sortInput = item.querySelector('input[name*="[sort_order]"]');
+                        if (sortInput) sortInput.value = index + 1;
+                    });
+                }
+            });
+        }
+
+        // Load SortableJS if available
+        if (typeof Sortable === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js';
+            script.onload = function() {
+                if (gallery) {
+                    new Sortable(gallery, {
+                        animation: 150,
+                        handle: '.drag-handle',
+                        onEnd: function () {
+                            document.querySelectorAll('.photo-item').forEach((item, index) => {
+                                const sortInput = item.querySelector('input[name*="[sort_order]"]');
+                                if (sortInput) sortInput.value = index + 1;
+                            });
+                        }
+                    });
+                }
+            };
+            document.head.appendChild(script);
+        }
     </script>
 @endpush

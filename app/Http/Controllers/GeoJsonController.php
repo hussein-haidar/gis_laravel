@@ -11,6 +11,9 @@ class GeoJsonController extends Controller
     public function index(Request $request): JsonResponse
     {
         $locations = Location::with('category')
+            ->whereHas('category', function ($q) {
+                $q->where('is_active', true);
+            })
             ->when($request->query('category'), function ($query, $categoryId) {
                 $query->where('category_id', $categoryId);
             })

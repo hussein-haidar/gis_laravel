@@ -48,6 +48,53 @@
                     @enderror
                 </div>
 
+                <div class="mb-3">
+                    <label for="icon" class="form-label">Ikon (Emoji)</label>
+                    <input type="text" name="icon" id="icon" value="{{ old('icon', $category->icon ?? '') }}"
+                           class="form-control @error('icon') is-invalid @enderror" maxlength="50"
+                           placeholder="cth: 🏞️, 🏛️, 🍽️ (opsional)">
+                    @error('icon')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text">Emoji untuk ditampilkan di daftar dan peta (maks 1 karakter emoji).</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="sort_order" class="form-label">Urutan Tampil</label>
+                    <input type="number" name="sort_order" id="sort_order" value="{{ old('sort_order', $category->sort_order ?? 0) }}"
+                           class="form-control @error('sort_order') is-invalid @enderror" min="0" max="9999">
+                    @error('sort_order')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text">Kategori dengan urutan lebih kecil ditampilkan lebih dulu.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="parent_id" class="form-label">Kategori Induk</label>
+                    <select name="parent_id" id="parent_id" class="form-select @error('parent_id') is-invalid @enderror">
+                        <option value="">-- Tidak ada (Kategori Utama) --</option>
+                        @foreach ($parents as $parent)
+                            <option value="{{ $parent->id }}" {{ (old('parent_id', $category->parent_id ?? '') == $parent->id) ? 'selected' : '' }}>
+                                {{ $parent->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('parent_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text">Pilih kategori induk untuk membuat hierarki (opsional).</div>
+                </div>
+
+                <div class="mb-3 form-check form-switch">
+                    <input type="checkbox" name="is_active" id="is_active" class="form-check-input"
+                           value="1" {{ old('is_active', $category->is_active ?? true) ? 'checked' : '' }} @error('is_active') is-invalid @enderror>
+                    <label class="form-check-label" for="is_active">Aktif</label>
+                    @error('is_active')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text">Kategori tidak aktif tidak akan ditampilkan di peta publik.</div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">{{ isset($category) ? 'Perbarui' : 'Simpan' }}</button>
                     <a href="{{ route('admin.categories.index') }}" class="btn btn-outline-secondary">Batal</a>

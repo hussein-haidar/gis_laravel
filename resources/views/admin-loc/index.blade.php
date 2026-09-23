@@ -34,11 +34,88 @@
             width: 12px; height: 12px; display: inline-block;
             margin-right: 6px; border-radius: 50%;
         }
+        .stat-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .stat-icon {
+            width: 48px; height: 48px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 12px;
+            font-size: 1.5rem;
+        }
     </style>
 @endsection
 
 @section('content')
     <h1 class="h3 mb-4">Kelola Lokasi</h1>
+
+    <!-- Dashboard Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Total Lokasi</div>
+                            <div class="h2 mb-0 fw-bold">{{ number_format($stats['total_locations']) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-tags-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Total Kategori</div>
+                            <div class="h2 mb-0 fw-bold">{{ number_format($stats['total_categories']) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-image-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Lokasi dengan Foto</div>
+                            <div class="h2 mb-0 fw-bold">{{ number_format($stats['locations_with_photos']) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon bg-info bg-opacity-10 text-info">
+                            <i class="bi bi-layers-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Lokasi dengan Geometry</div>
+                            <div class="h2 mb-0 fw-bold">{{ number_format($stats['locations_with_geometry']) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="card mb-4">
         <div class="card-body">
@@ -82,6 +159,10 @@
             <span>Daftar Lokasi ({{ $locations->total() }})</span>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-sm btn-danger" id="btn-bulk-delete" style="display:none;">🗑️ Hapus Terpilih (<span id="selected-count">0</span>)</button>
+                <form action="{{ route('admin.locations.sync') }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin sinkronisasi data dari API eksternal? Proses ini bisa memakan waktu beberapa detik.');">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-info">🔄 Sinkron Data API</button>
+                </form>
                 <a href="{{ route('admin.locations.create') }}" class="btn btn-sm btn-primary">+ Tambah Lokasi</a>
             </div>
         </div>

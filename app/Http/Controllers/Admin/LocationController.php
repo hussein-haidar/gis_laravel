@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\Gis\GisDataSyncService;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class LocationController extends Controller
 {
@@ -40,7 +42,21 @@ class LocationController extends Controller
 
         $categories = Category::orderBy('name')->get();
 
-        return view('admin-loc.index', compact('locations', 'categories', 'search', 'categoryId'));
+        // Dashboard stats
+        $stats = [
+            'total_locations' => Location::count(),
+            'total_categories' => Category::count(),
+            'locations_with_photos' => Location::whereNotNull('photo')->where('photo', '!=', '')->count(),
+            'locations_with_geometry' => Location::whereNotNull('geometry')->count(),
+            'recent_locations' => Location::latest()->take(5)->get(),
+            'locations_per_category' => Category::withCount('locations')
+                ->orderByDesc('locations_count')
+                ->get(),
+            'total_navigation_history' => \App\Models\NavigationHistory::count(),
+            'total_users' => \App\Models\User::count(),
+        ];
+
+        return view('admin-loc.index', compact('locations', 'categories', 'search', 'categoryId', 'stats'));
     }
 
     public function create(): View
@@ -50,10 +66,11 @@ class LocationController extends Controller
         return view('admin-loc.create', compact('categories'));
     }
 
-    public function store(Request $request)
+public function store(Request $request)
     {
         $data = $this->validated($request);
 
+        // Handle main photo (backward compatibility)
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('photos', 'public');
         }
@@ -61,6 +78,11 @@ class LocationController extends Controller
         $data['geometry'] = $this->buildGeometry($request);
 
         $location = Location::create($data);
+
+        // Handle multiple photos
+        if ($request->hasFile('photos')) {
+            $this->storePhotos($location, $request->file('photos'));
+        }
 
         $this->logActivity('location_created', $location, null, $location->toArray());
 
@@ -72,6 +94,7 @@ class LocationController extends Controller
     public function edit(Location $location): View
     {
         $categories = Category::orderBy('name')->get();
+        $location->load('photos');
 
         return view('admin-loc.edit', compact('location', 'categories'));
     }
@@ -82,11 +105,27 @@ class LocationController extends Controller
 
         $data = $this->validated($request);
 
+        // Handle main photo (backward compatibility)
         if ($request->hasFile('photo')) {
             if ($location->photo) {
                 Storage::disk('public')->delete($location->photo);
             }
             $data['photo'] = $request->file('photo')->store('photos', 'public');
+        }
+
+        // Handle multiple photos
+        if ($request->hasFile('photos')) {
+            $this->storePhotos($location, $request->file('photos'));
+        }
+
+        // Handle photo deletions
+        if ($request->filled('delete_photos')) {
+            $this->deletePhotos($location, $request->input('delete_photos'));
+        }
+
+        // Handle photo reordering/captions
+        if ($request->filled('photo_data')) {
+            $this->updatePhotoData($location, $request->input('photo_data'));
         }
 
         $data['geometry'] = $this->buildGeometry($request);
@@ -100,13 +139,68 @@ class LocationController extends Controller
             ->with('success', 'Lokasi berhasil diperbarui.');
     }
 
+    protected function storePhotos(Location $location, array $files): void
+    {
+        $maxSort = $location->photos()->max('sort_order') ?? 0;
+        $hasPrimary = $location->photos()->where('is_primary', true)->exists();
+
+        foreach ($files as $index => $file) {
+            $path = $file->store('photos', 'public');
+            $isPrimary = !$hasPrimary && $index === 0;
+
+            $location->photos()->create([
+                'path' => $path,
+                'sort_order' => $maxSort + $index + 1,
+                'is_primary' => $isPrimary,
+            ]);
+
+            if ($isPrimary) {
+                $hasPrimary = true;
+            }
+        }
+    }
+
+    protected function deletePhotos(Location $location, array $photoIds): void
+    {
+        $photos = $location->photos()->whereIn('id', $photoIds)->get();
+        foreach ($photos as $photo) {
+            if ($photo->path) {
+                Storage::disk('public')->delete($photo->path);
+            }
+            $photo->delete();
+        }
+    }
+
+    protected function updatePhotoData(Location $location, array $photoData): void
+    {
+        foreach ($photoData as $id => $data) {
+            $photo = $location->photos()->find($id);
+            if ($photo) {
+                $photo->update([
+                    'caption' => $data['caption'] ?? null,
+                    'sort_order' => $data['sort_order'] ?? $photo->sort_order,
+                    'is_primary' => $data['is_primary'] ?? false,
+                ]);
+            }
+        }
+    }
+
     public function destroy(Location $location)
     {
         $oldValues = $location->toArray();
 
+        // Delete main photo
         if ($location->photo) {
             Storage::disk('public')->delete($location->photo);
         }
+
+        // Delete additional photos
+        $location->photos()->each(function ($photo) {
+            if ($photo->path) {
+                Storage::disk('public')->delete($photo->path);
+            }
+            $photo->delete();
+        });
 
         $location->delete();
 
@@ -125,12 +219,18 @@ class LocationController extends Controller
         ]);
 
         $ids = $request->ids;
-        $locations = Location::whereIn('id', $ids)->get();
+        $locations = Location::whereIn('id', $ids)->with('photos')->get();
 
         foreach ($locations as $location) {
             if ($location->photo) {
                 Storage::disk('public')->delete($location->photo);
             }
+            $location->photos()->each(function ($photo) {
+                if ($photo->path) {
+                    Storage::disk('public')->delete($photo->path);
+                }
+                $photo->delete();
+            });
             $this->logActivity('location_deleted', null, $location->toArray(), null);
         }
 
@@ -223,17 +323,39 @@ class LocationController extends Controller
             ->when($categoryId, function ($query) use ($categoryId) {
                 $query->where('category_id', $categoryId);
             })
-            ->orderBy('name')
+->orderBy('name')
             ->get();
 
-        if (! in_array($format, ['csv', 'json', 'xlsx'])) {
+        if (! in_array($format, ['csv', 'json', 'xlsx', 'pdf'])) {
             $format = 'csv';
         }
 
         $filename = 'lokasi_' . now()->format('Y-m-d_His') . '.' . $format;
 
+        // Log export activity
+        ActivityLog::create([
+            'user_id' => Auth::id(),
+            'type' => 'location_export',
+            'subject_type' => Location::class,
+            'subject_id' => null,
+            'old_values' => null,
+            'new_values' => [
+                'format' => $format,
+                'count' => $locations->count(),
+                'filename' => $filename,
+            ],
+            'description' => "Ekspor {$locations->count()} lokasi ke format {$format}",
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
         if ($format === 'xlsx') {
             return Excel::download(new LocationsExport($locations), $filename);
+        }
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('admin-loc.pdf', ['locations' => $locations]);
+            return $pdf->download($filename);
         }
 
         if ($format === 'json') {
@@ -380,6 +502,23 @@ class LocationController extends Controller
         if (count($problems) > 0) {
             $message .= ' ' . count($problems) . " catatan. Detail: " . implode(' | ', array_slice($problems, 0, 5));
         }
+
+        // Log import activity
+        ActivityLog::create([
+            'user_id' => Auth::id(),
+            'type' => 'location_import',
+            'subject_type' => Location::class,
+            'subject_id' => null,
+            'old_values' => null,
+            'new_values' => [
+                'imported' => $imported,
+                'errors' => count($errors),
+                'warnings' => count($warnings),
+            ],
+            'description' => "Impor {$imported} lokasi dari file {$extension}",
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
 
         return redirect()
             ->route('admin.locations.index')
@@ -555,6 +694,26 @@ class LocationController extends Controller
         ]);
     }
 
+    public function sync(GisDataSyncService $syncService)
+    {
+        try {
+            $stats = $syncService->sync();
+
+            $message = "Sinkronisasi selesai: {$stats['created']} dibuat, {$stats['updated']} diperbarui, {$stats['skipped']} dilewati";
+            if ($stats['errors'] > 0) {
+                $message .= ", {$stats['errors']} error";
+            }
+
+            return redirect()
+                ->route('admin.locations.index')
+                ->with($stats['errors'] > 0 ? 'warning' : 'success', $message);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('admin.locations.index')
+                ->with('error', 'Sinkronisasi gagal: ' . $e->getMessage());
+        }
+    }
+
     private function validated(Request $request): array
     {
         return $request->validate([
@@ -564,6 +723,10 @@ class LocationController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
+            'photos.*' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
+            'delete_photos' => ['nullable', 'array'],
+            'delete_photos.*' => ['integer', 'exists:location_photos,id'],
+            'photo_data' => ['nullable', 'array'],
             'geometry_type' => ['nullable', 'string', 'in:Point,LineString,Polygon,MultiPoint,MultiLineString,MultiPolygon'],
             'geometry_coords' => ['nullable', 'string'],
         ]);

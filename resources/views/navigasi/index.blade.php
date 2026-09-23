@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Navigasi & Rute')
+@section('title', __('messages.navigasi_title'))
 
 @section('styles')
     <style>
@@ -187,10 +187,10 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-secondary btn-sm" onclick="history.back()" title="Kembali ke halaman sebelumnya">← Kembali</button>
-            <h1 class="h3 mb-0">🧭 Navigasi &amp; Rute Kendaraan</h1>
+            <button class="btn btn-outline-secondary btn-sm" onclick="history.back()" title="{{ __('messages.back') }}">← {{ __('messages.back') }}</button>
+            <h1 class="h3 mb-0">🧭 {{ __('messages.navigasi_title') }}</h1>
         </div>
-        <span class="badge traffic-badge text-white" id="traffic-badge" style="background:#6b7280;">Memuat status...</span>
+        <span class="badge traffic-badge text-white" id="traffic-badge" style="background:#6b7280;">{{ __('messages.traffic_loading') }}</span>
     </div>
 
     <div class="row g-3">
@@ -198,80 +198,80 @@
         <div class="col-lg-4 col-xl-3">
             <div class="route-panel p-3 mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <h6 class="mb-0">📍 Lokasi Terkini (Asal)</h6>
-                    <button class="btn btn-sm btn-outline-primary" id="btn-my-location" title="Gunakan lokasi saya">
+                    <h6 class="mb-0">📍 {{ __('messages.origin_heading') }}</h6>
+                    <button class="btn btn-sm btn-outline-primary" id="btn-my-location" title="{{ __('messages.toolbar_my_location') }}">
                         📡 GPS
                     </button>
                 </div>
                 <div class="position-relative mb-3">
-                    <input type="text" id="origin-input" class="form-control" placeholder="Deteksi GPS / ketik lokasi asal...">
+                    <input type="text" id="origin-input" class="form-control" placeholder="{{ __('messages.route_origin_placeholder') }}">
                     <div id="origin-suggest" class="suggestion-box d-none"></div>
                 </div>
 
-                <h6 class="mb-2">🎯 Lokasi Tujuan</h6>
+                <h6 class="mb-2">🎯 {{ __('messages.destination_heading') }}</h6>
                 <div class="position-relative mb-3">
-                    <input type="text" id="destination-input" class="form-control" placeholder="Ketik lokasi / alamat tujuan...">
+                    <input type="text" id="destination-input" class="form-control" placeholder="{{ __('messages.route_destination_placeholder') }}">
                     <div id="destination-suggest" class="suggestion-box d-none"></div>
                 </div>
 
                 <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-sm btn-outline-secondary flex-fill" id="btn-swap">⇅ Tukar</button>
+                    <button class="btn btn-sm btn-outline-secondary flex-fill" id="btn-swap">⇅ {{ __('messages.swap') }}</button>
                 </div>
 
-                <h6 class="mb-2">🚙 Pilih Kendaraan</h6>
+                <h6 class="mb-2">🚙 {{ __('messages.choose_vehicle') }}</h6>
                 <div class="row g-2 mb-3" id="vehicle-list"></div>
                 <div class="form-text mt-0 mb-3 small" id="vehicle-label"></div>
 
-                <h6 class="mb-2 border-top pt-3">Opsi Rute</h6>
+                <h6 class="mb-2 border-top pt-3">{{ __('messages.route_options') }}</h6>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="avoid-toll">
-                    <label class="form-check-label small" for="avoid-toll">🚧 Hindari Tol <span class="text-muted">(nonaktif = lewat tol)</span></label>
+                    <label class="form-check-label small" for="avoid-toll">🚧 {{ __('messages.avoid_toll') }} <span class="text-muted">{{ __('messages.avoid_toll_note') }}</span></label>
                 </div>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="avoid-traffic">
-                    <label class="form-check-label small" for="avoid-traffic">🚦 Hindari Kemacetan Parah</label>
+                    <label class="form-check-label small" for="avoid-traffic">🚦 {{ __('messages.avoid_traffic') }}</label>
                 </div>
                 <div class="form-check form-switch mb-1" id="avoid-bridge-wrap">
                     <input class="form-check-input" type="checkbox" id="avoid-bridge">
-                    <label class="form-check-label small" for="avoid-bridge">🌉 Hindari Jembatan Rendah <span class="text-muted" id="bridge-note"></span></label>
+                    <label class="form-check-label small" for="avoid-bridge">🌉 {{ __('messages.avoid_bridge') }} <span class="text-muted" id="bridge-note"></span></label>
                 </div>
 
-                <button class="btn btn-primary w-100 mt-3" id="btn-find-route">▶ Mulai Navigasi</button>
-                <button class="btn btn-outline-danger w-100 mt-2 d-none" id="btn-clear">Hapus Rute</button>
+                <button class="btn btn-primary w-100 mt-3" id="btn-find-route">▶ {{ __('messages.start_navigation') }}</button>
+                <button class="btn btn-outline-danger w-100 mt-2 d-none" id="btn-clear">{{ __('messages.clear_route') }}</button>
             </div>
 
             <!-- Ringkasan Rute -->
             <div class="route-panel p-3 mb-3 d-none" id="result-panel">
                 <div class="row g-2 route-summary mb-2">
                     <div class="col-4 col-card">
-                        <div class="text-muted small">Jarak</div>
+                        <div class="text-muted small">{{ __('messages.history_distance') }}</div>
                         <div class="fw-bold" id="res-distance">-</div>
                     </div>
                     <div class="col-4 col-card">
-                        <div class="text-muted small">Waktu</div>
+                        <div class="text-muted small">{{ __('messages.time') }}</div>
                         <div class="fw-bold" id="res-duration">-</div>
                     </div>
                     <div class="col-4 col-card">
-                        <div class="text-muted small">Status</div>
+                        <div class="text-muted small">{{ __('messages.status') }}</div>
                         <div class="fw-bold" id="res-status">-</div>
                     </div>
                 </div>
                 <div class="alert alert-warning py-1 px-2 small d-none" id="res-warnings"></div>
                 <div class="small d-none mb-2" id="res-congestion">
-                    <div class="fw-bold small mb-1">🚦 Kemacetan sepanjang rute:</div>
+                    <div class="fw-bold small mb-1">🚦 {{ __('messages.traffic_along_route') }}</div>
                     <div id="res-congestion-list"></div>
                 </div>
                 <div class="alert alert-danger py-1 px-2 small d-none" id="res-jam" role="alert">
-                    🔴 <strong>Kemacetan parah terdeteksi di rute!</strong> Gunakan "Mulai Navigasi" lalu tombol <em>Alihkan Rute</em>.
+                    🔴 <strong>{{ __('messages.traffic_severe_detected') }}</strong>
                 </div>
-                <h6 class="small fw-bold mb-1">Petunjuk Arah</h6>
+                <h6 class="small fw-bold mb-1">{{ __('messages.directions') }}</h6>
                 <div id="instructions-list"></div>
                 <div class="mt-2 small text-muted" id="traffic-legend" style="display:none;">
-                    <div class="mb-1">Kemacetan real-time (sepanjang rute):</div>
-                    <div><span class="legend-dot" style="background:#e60000;"></span>Macet parah</div>
-                    <div><span class="legend-dot" style="background:#e6b800;"></span>Padat</div>
-                    <div><span class="legend-dot" style="background:#60a5fa;"></span>Ramai</div>
-                    <div><span class="legend-dot" style="background:#16a34a;"></span>Lancar</div>
+                    <div class="mb-1">{{ __('messages.traffic_realtime') }}</div>
+                    <div><span class="legend-dot" style="background:#e60000;"></span>{{ __('messages.jam_severe') }}</div>
+                    <div><span class="legend-dot" style="background:#e6b800;"></span>{{ __('messages.jam_heavy') }}</div>
+                    <div><span class="legend-dot" style="background:#60a5fa;"></span>{{ __('messages.jam_busy') }}</div>
+                    <div><span class="legend-dot" style="background:#16a34a;"></span>{{ __('messages.jam_flow') }}</div>
                 </div>
             </div>
         </div>
@@ -280,15 +280,15 @@
         <div class="col-lg-8 col-xl-9">
             <div class="card" id="map-card">
                 <div class="nav-overlay" id="nav-overlay">
-                    <button class="nav-close" id="nav-close-btn" title="Hentikan navigasi">&times;</button>
+                    <button class="nav-close" id="nav-close-btn" title="{{ __('messages.stop_navigation') }}">&times;</button>
                     <div class="nav-step-text" id="nav-step-text">--</div>
                     <div class="nav-step-detail" id="nav-step-detail"></div>
                     <div class="nav-remaining" id="nav-remaining"></div>
                 </div>
                 <div class="card-body">
                     <div id="map"></div>
-                    <div class="layer-badge" id="traffic-badge-map">🚦 Kemacetan: Memuat...</div>
-                    <button class="jam-toggle" id="btn-toggle-jam" type="button">🚦 Kemacetan: ON</button>
+                    <div class="layer-badge" id="traffic-badge-map">🚦 {{ __('messages.congestion_loading') }}</div>
+                    <button class="jam-toggle" id="btn-toggle-jam" type="button">🚦 {{ __('messages.congestion_on') }}</button>
 
                     <div class="fs-nav-panel">
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -296,7 +296,7 @@
                                 <div class="fw-bold" id="fs-nav-title" style="font-size:1.05rem;">--</div>
                                 <div class="small text-muted" id="fs-nav-sub"></div>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" id="btn-exit-fullscreen">&times; Selesai</button>
+                            <button class="btn btn-sm btn-outline-danger" id="btn-exit-fullscreen">&times; {{ __('messages.done') }}</button>
                         </div>
                         <div class="fs-nav-steps" id="fs-nav-steps"></div>
                     </div>
@@ -305,11 +305,11 @@
                         <div class="d-flex align-items-start gap-3">
                             <div class="rp-icon">⚠️</div>
                             <div class="flex-grow-1">
-                                <div class="rp-title">Rute di depan macet parah!</div>
+                                <div class="rp-title">{{ __('messages.reroute_title') }}</div>
                                 <div class="small text-muted" id="reroute-info"></div>
                                 <div class="d-flex gap-2 mt-3">
-                                    <button type="button" class="btn btn-sm btn-warning flex-fill" id="btn-reroute-now">🛣️ Alihkan Rute</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" id="btn-reroute-skip">Lewati</button>
+                                    <button type="button" class="btn btn-sm btn-warning flex-fill" id="btn-reroute-now">🛣️ {{ __('messages.reroute_now') }}</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" id="btn-reroute-skip">{{ __('messages.reroute_skip') }}</button>
                                 </div>
                             </div>
                         </div>
@@ -317,7 +317,7 @@
                 </div>
             </div>
             <div class="text-muted small mt-2" id="nav-tip">
-                💡 Pilih kendaraan lalu tekan <strong>▶ Mulai Navigasi</strong> — rute dihitung berdasarkan jenis kendaraan (truk/bis dijauhkan dari jalan kecil &amp; jembatan rendah) lalu langsung masuk <strong>layar penuh</strong>. Tutup dengan tombol <strong>Selesai</strong> untuk melihat resume rute.
+                💡 {{ __('messages.nav_tip') }}
             </div>
         </div>
     </div>

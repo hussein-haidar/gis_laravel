@@ -22,6 +22,8 @@ class User extends Authenticatable implements CanResetPasswordContract
         'email',
         'password',
         'role_id',
+        'google_id',
+        'avatar',
     ];
 
     protected $hidden = [
@@ -40,6 +42,21 @@ class User extends Authenticatable implements CanResetPasswordContract
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function favorites(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    public function favoriteLocations(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Location::class, 'favorites')->withTimestamps();
     }
 
     public function isSuperAdmin(): bool

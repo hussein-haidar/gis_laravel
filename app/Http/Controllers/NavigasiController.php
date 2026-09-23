@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\Location;
 use App\Services\Routing\RoutingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class NavigasiController extends Controller
@@ -17,7 +19,7 @@ class NavigasiController extends Controller
 
     public function index(): View
     {
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::active()->ordered()->get();
 
         return view('navigasi.index', compact('categories'));
     }
@@ -48,5 +50,34 @@ class NavigasiController extends Controller
                     'lng' => (float) $loc->longitude,
                 ])
         );
+    }
+
+    /**
+     * Log navigasi activity when route is calculated.
+     */
+    public function logNavigation(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'origin' => ['required', 'array', 'size:2'],
+            'destination' => ['required', 'array', 'size:2'],
+            'vehicle' => ['required', 'string'],
+            'distance_km' => ['nullable', 'numeric'],
+            'duration_min' => ['nullable', 'numeric'],
+            'engine' => ['nullable', 'string'],
+        ]);
+
+        ActivityLog::create([
+            'user_id' => Auth::id(),
+            'type' => 'navigation_route',
+            'subject_type' => Location::class,
+            'subject_id' => null,
+            'old_values' => null,
+            'new_values' => $validated,
+            'description' => "Navigasi {$validated['vehicle']}: {$validated['distance_km']} km, {$validated['duration_min']} menit",
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return response()->json(['success' => true]);
     }
 }

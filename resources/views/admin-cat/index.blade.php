@@ -31,10 +31,13 @@
                     <thead class="table-dark">
                         <tr>
                             <th>#</th>
+                            <th>Ikon</th>
                             <th>Nama</th>
                             <th>Warna</th>
+                            <th>Urutan</th>
+                            <th>Parent</th>
+                            <th>Status</th>
                             <th>Jumlah Lokasi</th>
-                            <th>Deskripsi</th>
                             <th class="text-end">Aksi</th>
                         </tr>
                     </thead>
@@ -42,6 +45,13 @@
                         @forelse ($categories as $index => $category)
                             <tr>
                                 <td>{{ $categories->firstItem() + $index }}</td>
+                                <td>
+                                    @if ($category->icon)
+                                        <span class="fs-5">{{ $category->icon }}</span>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
                                 <td><strong>{{ $category->name }}</strong></td>
                                 <td>
                                     <span class="d-inline-flex align-items-center gap-2">
@@ -49,10 +59,24 @@
                                         <code>{{ $category->color }}</code>
                                     </span>
                                 </td>
+                                <td>{{ $category->sort_order }}</td>
+                                <td>
+                                    @if ($category->parent)
+                                        <small class="text-muted">{{ $category->parent->name }}</small>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($category->is_active)
+                                        <span class="badge bg-success">Aktif</span>
+                                    @else
+                                        <span class="badge bg-secondary">Tidak Aktif</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <span class="badge bg-secondary">{{ $category->locations_count }} lokasi</span>
                                 </td>
-                                <td class="small text-muted">{{ Str::limit($category->description, 60) ?? '-' }}</td>
                                 <td class="text-end">
                                     <a href="{{ route('admin.categories.edit', $category) }}" class="btn btn-sm btn-warning">Edit</a>
                                     <form action="{{ route('admin.categories.destroy', $category) }}" method="POST" class="d-inline"
@@ -65,7 +89,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="9" class="text-center text-muted py-4">
                                     {{ $search ? 'Tidak ada kategori yang cocok.' : 'Belum ada data kategori.' }}
                                 </td>
                             </tr>

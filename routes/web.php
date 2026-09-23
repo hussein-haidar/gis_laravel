@@ -9,13 +9,36 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MapController::class, 'index'])->name('map.index');
 Route::get('lokasi/{location}', [MapController::class, 'show'])->name('map.show');
+Route::get('placeholder/{location}', [\App\Http\Controllers\PlaceholderController::class, 'show'])->name('placeholder.show');
 
-Route::get('navigasi', [NavigasiController::class, 'index'])->name('navigasi.index');
-Route::get('navigasi/lokasi', [NavigasiController::class, 'searchLocations'])->name('navigasi.locations');
+Route::middleware('auth')->group(function () {
+    Route::post('lokasi/{location}/reviews', [\App\Http\Controllers\ReviewController::class, 'store'])->name('reviews.store');
+    Route::get('favorit', [\App\Http\Controllers\FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post('favorit/{location}', [\App\Http\Controllers\FavoriteController::class, 'toggle'])->name('favorites.toggle');
+
+    Route::get('pemberitahuan', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('pemberitahuan/belum-terbaca', [\App\Http\Controllers\NotificationController::class, 'unreadCount'])->name('notifications.unread');
+    Route::get('pemberitahuan/terbaru', [\App\Http\Controllers\NotificationController::class, 'latest'])->name('notifications.latest');
+    Route::post('pemberitahuan/baca-semua', [\App\Http\Controllers\NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('pemberitahuan/{notification}/baca', [\App\Http\Controllers\NotificationController::class, 'read'])->name('notifications.read');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('navigasi', [NavigasiController::class, 'index'])->name('navigasi.index');
+    Route::get('navigasi/lokasi', [NavigasiController::class, 'searchLocations'])->name('navigasi.locations');
+    Route::post('navigasi/log', [NavigasiController::class, 'logNavigation'])->name('navigasi.log');
+});
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login']);
+
+    Route::get('register', [AuthController::class, 'showRegister'])->name('register');
+    Route::post('register', [AuthController::class, 'register']);
+
+    // Google OAuth
+    Route::get('auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
     Route::get('forgot-password', [AuthController::class, 'showForgotForm'])->name('password.request');
     Route::post('forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
@@ -26,6 +49,7 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
+Route::get('language/{locale}', [\App\Http\Controllers\LanguageController::class, 'switch'])->name('language.switch');
 
 // ── Riwayat Navigasi (untuk semua user login) ────────────────────────────────
 Route::middleware('auth')->prefix('riwayat')->name('history.')->group(function () {
@@ -67,7 +91,8 @@ Route::middleware(['auth', 'role:super_admin'])->prefix('super-admin')->name('su
 
 // ── Admin Routes ─────────────────────────────────────────────────────────────
 Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::redirect('/', '/admin/locations');
+    Route::get('dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+    Route::redirect('/', '/admin/dashboard');
 
     Route::get('password', [AuthController::class, 'showPasswordForm'])->name('password.form');
     Route::post('password', [AuthController::class, 'changePassword'])->name('password.update');
@@ -81,6 +106,16 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
     Route::get('locations/impor', [\App\Http\Controllers\Admin\LocationController::class, 'importForm'])->name('locations.import');
     Route::post('locations/impor', [\App\Http\Controllers\Admin\LocationController::class, 'import'])->name('locations.import.store');
     Route::get('locations/template', [\App\Http\Controllers\Admin\LocationController::class, 'template'])->name('locations.template');
+    Route::post('locations/sync', [\App\Http\Controllers\Admin\LocationController::class, 'sync'])->name('locations.sync');
 
     Route::resource('categories', \App\Http\Controllers\Admin\CategoryController::class)->except(['show']);
+
+    Route::resource('users', \App\Http\Controllers\Admin\UserController::class)->except(['show']);
+
+    Route::get('reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');
+    Route::post('reviews/{review}/moderate', [\App\Http\Controllers\Admin\ReviewController::class, 'moderate'])->name('reviews.moderate');
+    Route::delete('reviews/{review}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+    Route::get('pengaturan', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
+    Route::put('pengaturan', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
 });

@@ -17,13 +17,14 @@ class CategoryController extends Controller
 
         $categories = Category::query()
             ->withCount('locations')
+            ->with('parent')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('name')
+            ->ordered()
             ->paginate(10)
             ->withQueryString();
 
@@ -32,7 +33,8 @@ class CategoryController extends Controller
 
     public function create(): View
     {
-        return view('admin-cat.create');
+        $parents = Category::root()->ordered()->get();
+        return view('admin-cat.create', compact('parents'));
     }
 
     public function store(Request $request)
@@ -50,7 +52,8 @@ class CategoryController extends Controller
 
     public function edit(Category $category): View
     {
-        return view('admin-cat.edit', compact('category'));
+        $parents = Category::root()->where('id', '!=', $category->id)->ordered()->get();
+        return view('admin-cat.edit', compact('category', 'parents'));
     }
 
     public function update(Request $request, Category $category)
@@ -92,6 +95,10 @@ class CategoryController extends Controller
             'name' => ['required', 'string', 'max:255', 'unique:categories,name' . ($ignoreId ? ",{$ignoreId}" : '')],
             'color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'icon' => ['nullable', 'string', 'max:50'],
+            'parent_id' => ['nullable', 'exists:categories,id'],
+            'is_active' => ['boolean'],
         ]);
     }
 

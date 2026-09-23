@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Peta Lokasi')
+@section('title', __('messages.page_map_title'))
 
 @section('styles')
     <style>
@@ -33,10 +33,26 @@
             background: #fff; padding: 8px 12px;
             border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
             font-size: 13px; line-height: 1.7;
+            margin-bottom: 30px;
         }
         .map-legend i {
             width: 12px; height: 12px;
             display: inline-block; margin-right: 6px; border-radius: 50%;
+        }
+        .map-legend .cluster-legend {
+            width: 18px; height: 18px; line-height: 18px;
+            background: #2c7be5; color: #fff;
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 9px; font-weight: bold;
+            margin-right: 6px; vertical-align: middle;
+        }
+        .map-legend .cluster-sample {
+            width: 14px; height: 14px;
+            background: linear-gradient(135deg, #2c7be5 50%, #e11d48 50%);
+            border-radius: 50%;
+            display: inline-block; margin-right: 6px; vertical-align: middle;
+            border: 1px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }
         .map-legend .road {
             width: 18px; height: 7px; border-radius: 3px;
@@ -97,7 +113,7 @@
 @endsection
 
 @section('content')
-    <h1 class="h3 mb-4">Peta Lokasi Wisata &amp; Tempat</h1>
+    <h1 class="h3 mb-4">{{ __('messages.page_map_title') }}</h1>
 
     <div class="card mb-4">
         <div class="card-body">
@@ -106,20 +122,20 @@
                     <div class="input-group">
                         <span class="input-group-text">🔍</span>
                         <input type="text" name="search" value="{{ $search }}" class="form-control"
-                               placeholder="Cari nama atau deskripsi lokasi...">
+                               placeholder="{{ __('messages.search_placeholder') }}">
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <select name="category" class="form-select">
-                        <option value="">Semua Kategori</option>
+                    <select name="category" class="form-select" onchange="this.form.submit()">
+                        <option value="">{{ __('messages.all_categories') }}</option>
                         @foreach ($categories as $category)
                             <option value="{{ $category->id }}" @selected((string) $categoryId === (string) $category->id)>{{ $category->name }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div class="col-md-4 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-fill">Cari</button>
-                    <a href="{{ route('map.index') }}" class="btn btn-outline-secondary">Reset</a>
+                    <button type="submit" class="btn btn-primary flex-fill">{{ __('messages.search') }}</button>
+                    <a href="{{ route('map.index') }}" class="btn btn-outline-secondary">{{ __('messages.reset') }}</a>
                 </div>
             </form>
         </div>
@@ -128,33 +144,33 @@
     <div class="position-relative mb-4">
         <div id="map" style="border-radius:8px;"></div>
         <div class="map-toolbar">
-            <button class="btn btn-sm btn-light" id="btn-routing" title="Rute Antar Lokasi">🛣️ Rute</button>
-            <button class="btn btn-sm btn-light" id="btn-geocode" title="Cari Alamat">📍 Cari Alamat</button>
-            <button class="btn btn-sm btn-light" id="btn-my-location" title="Lokasi Saya">📡 Lokasi Saya</button>
-            <button class="btn btn-sm btn-light" id="btn-print-map" title="Cetak Peta">🖨️ Cetak</button>
-            <button class="btn btn-sm btn-light" id="btn-export-png" title="Export PNG">📸 Export PNG</button>
+            <button class="btn btn-sm btn-light" id="btn-routing" title="{{ __('messages.toolbar_route') }}">🛣️ {{ __('messages.toolbar_route') }}</button>
+            <button class="btn btn-sm btn-light" id="btn-geocode" title="{{ __('messages.toolbar_geocode') }}">📍 {{ __('messages.toolbar_geocode') }}</button>
+            <button class="btn btn-sm btn-light" id="btn-my-location" title="{{ __('messages.toolbar_my_location') }}">📡 {{ __('messages.toolbar_my_location') }}</button>
+            <button class="btn btn-sm btn-light" id="btn-print-map" title="{{ __('messages.toolbar_print') }}">🖨️ {{ __('messages.toolbar_print') }}</button>
+            <button class="btn btn-sm btn-light" id="btn-export-png" title="{{ __('messages.toolbar_export_png') }}">📸 {{ __('messages.toolbar_export_png') }}</button>
         </div>
 
         <div class="routing-panel" id="routing-panel">
-            <h6 class="mb-2">Rute Antar Lokasi</h6>
+            <h6 class="mb-2">{{ __('messages.toolbar_route') }}</h6>
             <div class="mb-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <div class="small fw-bold">📍 Lokasi Terkini (Asal)</div>
-                    <button class="btn btn-sm btn-outline-primary" id="btn-gps-origin" type="button" title="Deteksi lokasi saya">📡 GPS</button>
+                    <div class="small fw-bold">📍 {{ __('messages.route_origin') }}</div>
+                    <button class="btn btn-sm btn-outline-primary" id="btn-gps-origin" type="button" title="{{ __('messages.toolbar_my_location') }}">📡 GPS</button>
                 </div>
                 <div class="position-relative">
-                    <input type="text" id="route-from-input" class="form-control form-control-sm" placeholder="Deteksi GPS / ketik lokasi asal...">
+                    <input type="text" id="route-from-input" class="form-control form-control-sm" placeholder="{{ __('messages.route_origin_placeholder') }}">
                     <div id="route-from-suggest" class="suggestion-box d-none"></div>
                 </div>
             </div>
             <div class="mb-2">
-                <div class="small fw-bold mb-1">🎯 Lokasi Tujuan</div>
+                <div class="small fw-bold mb-1">🎯 {{ __('messages.route_destination') }}</div>
                 <div class="position-relative">
-                    <input type="text" id="route-to-input" class="form-control form-control-sm" placeholder="Ketik lokasi / alamat tujuan...">
+                    <input type="text" id="route-to-input" class="form-control form-control-sm" placeholder="{{ __('messages.route_destination_placeholder') }}">
                     <div id="route-to-suggest" class="suggestion-box d-none"></div>
                 </div>
             </div>
-            <label class="form-label small mb-1">Jenis Kendaraan</label>
+            <label class="form-label small mb-1">{{ __('messages.vehicle_type') }}</label>
             <div class="vehicle-picker d-flex flex-wrap gap-1 mb-2" id="vehicle-picker">
                 <button type="button" class="vehicle-btn active" data-vehicle="mobil" data-icon="🚗" title="Mobil">🚗</button>
                 <button type="button" class="vehicle-btn" data-vehicle="motor" data-icon="🏍️" title="Motor">🏍️</button>
@@ -165,34 +181,30 @@
             </div>
             <div class="text-muted small mb-2" id="vehicle-label">Mobil</div>
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-primary flex-fill" id="btn-find-route">▶ Mulai Navigasi</button>
-                <button class="btn btn-sm btn-outline-danger" id="btn-clear-route">Hapus</button>
+                <button class="btn btn-sm btn-primary flex-fill" id="btn-find-route">▶ {{ __('messages.start_navigation') }}</button>
+                <button class="btn btn-sm btn-outline-danger" id="btn-clear-route">{{ __('messages.clear') }}</button>
             </div>
             <div id="route-info" class="mt-2 small"></div>
         </div>
 
         <div class="geocoder-panel" id="geocoder-panel" style="position:absolute;top:10px;left:50px;z-index:1000;background:#fff;padding:10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.2);width:320px;display:none;">
-            <h6 class="mb-2">Cari Alamat / Geocoding</h6>
+            <h6 class="mb-2">{{ __('messages.geocoder_title') }}</h6>
             <div class="input-group input-group-sm mb-2">
-                <input type="text" id="geocode-input" class="form-control" placeholder="Ketik alamat atau tempat...">
-<button class="btn btn-primary" id="btn-geocode-search">Cari</button>
+                <input type="text" id="geocode-input" class="form-control" placeholder="{{ __('messages.geocoder_placeholder') }}">
+<button class="btn btn-primary" id="btn-geocode-search">{{ __('messages.search') }}</button>
         </div>
 <div id="geocode-results" style="max-height:200px;overflow-y:auto;"></div>
         <hr class="my-1">
         </div>
     </div>
 
-    <h2 class="h5 mb-3">Daftar Lokasi ({{ $locations->count() }})</h2>
+    <h2 class="h5 mb-3">{{ __('messages.location_list', ['count' => $locations->count()]) }}</h2>
 
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
         @forelse ($locations as $location)
             <div class="col">
                 <a href="{{ route('map.show', $location) }}" class="card location-card h-100 text-decoration-none text-dark">
-                    @if ($location->photo)
-                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}">
-                    @else
-                        <div class="d-flex align-items-center justify-content-center text-muted" style="height:130px;background:#f1f5f9;">Tidak ada foto</div>
-                    @endif
+                    <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" loading="lazy">
                     <div class="card-body">
                         <h3 class="h6 mb-1">{{ $location->name }}</h3>
                         @if ($location->category)
@@ -205,7 +217,7 @@
         @empty
             <div class="col-12">
                 <div class="alert alert-info text-center">
-                    {{ ($search || $categoryId) ? 'Tidak ada lokasi yang cocok.' : 'Belum ada data lokasi.' }}
+                    {{ ($search || $categoryId) ? __('messages.no_location_matching') : __('messages.no_location_data') }}
                 </div>
             </div>
         @endforelse
@@ -215,6 +227,7 @@
 @section('scripts')
     <script>
         const locations = @json($locations);
+        const PLACE_TYPES = {!! json_encode($categories->pluck('name')) !!};
 
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '&copy; OpenStreetMap'
@@ -242,11 +255,11 @@
         map.setMinZoom(2);
         map.options.worldCopyJump = false;
 
-        L.control.layers({
-            'OpenStreetMap': osm,
-            'Satelit': satellite,
-            'Terrain': terrain,
-        }, null, { position: 'topright' }).addTo(map);
+        const baseMaps = {
+            '🗺️ OpenStreetMap': osm,
+            '🛰️ Satelit': satellite,
+            '⛰️ Terrain': terrain,
+        };
 
         L.control.scale({ imperial: false }).addTo(map);
 
@@ -289,7 +302,35 @@
             drawnItems.addLayer(e.layer);
         });
 
-        const categoryClusters = {};
+        const locationsLayer = L.markerClusterGroup({
+            maxClusterRadius: 42,
+            showCoverageOnHover: false,
+            iconCreateFunction: function (cluster) {
+                const children = cluster.getAllChildMarkers();
+                const tally = {};
+                children.forEach(function (m) {
+                    const c = m.options.placeColor || '#9ca3af';
+                    tally[c] = (tally[c] || 0) + 1;
+                });
+                let dom = '#9ca3af', max = -1;
+                Object.keys(tally).forEach(function (c) {
+                    if (tally[c] > max) { max = tally[c]; dom = c; }
+                });
+                let domName = '';
+                children.forEach(function (m) {
+                    if (!domName && (m.options.placeColor || '#9ca3af') === dom) {
+                        domName = m.options.placeName || '';
+                    }
+                });
+                const size = cluster.getChildCount() > 50 ? 52 : 44;
+                return L.divIcon({
+                    html: '<div title="' + domName + ' (kategori dominan, ' + cluster.getChildCount() + ' lokasi)" style="background:' + dom + ';width:' + size + 'px;height:' + size + 'px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);">' + cluster.getChildCount() + '</div>',
+                    className: '',
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2],
+                });
+            },
+        });
         const allMarkers = [];
         const heatData = [];
         let heatLayer = null;
@@ -297,11 +338,6 @@
 
         locations.forEach(function (loc) {
             const color = loc.category ? loc.category.color : '#9ca3af';
-            const key = loc.category ? loc.category.id : 'none';
-
-            if (!categoryClusters[key]) {
-                categoryClusters[key] = L.layerGroup();
-            }
 
             const icon = L.divIcon({
                 className: 'custom-marker',
@@ -309,10 +345,15 @@
                 iconSize: [26, 26], iconAnchor: [13, 26],
             });
 
-            const marker = L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], { icon: icon });
+            const marker = L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], {
+                icon: icon,
+                placeColor: color,
+                placeName: loc.category ? loc.category.name : '',
+            });
 
             const photo = loc.photo_url
-                ? `<img src="${loc.photo_url}" alt="${loc.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>` : '';
+                ? `<img src="${loc.photo_url}" alt="${loc.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`
+                : `<img src="${'{{ route('placeholder.show', ':id') }}'.replace(':id', loc.id)}" alt="${loc.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
             const category = loc.category
                 ? `<span style="color:${color};font-weight:600">● ${loc.category.name}</span><br>` : '';
 
@@ -320,16 +361,15 @@
                 `${photo}<strong>${loc.name}</strong><br>` + category +
                 (loc.description ? loc.description + '<br>' : '') +
                 `${loc.latitude}, ${loc.longitude}<br>` +
-                `<a href="${'{{ route('map.show', ':id') }}'.replace(':id', loc.id)}" class="small">Lihat Detail →</a>`
+                `<a href="${'{{ route('map.show', ':id') }}'.replace(':id', loc.id)}" class="small">{{ __('messages.view_detail') }} →</a>`
             );
 
-            categoryClusters[key].addLayer(marker);
+            locationsLayer.addLayer(marker);
             allMarkers.push(marker);
             heatData.push([parseFloat(loc.latitude), parseFloat(loc.longitude), 0.5]);
         });
 
         const overlays = {};
-        const legendItems = [];
 
         const congestionIconHtml = {
             severe: '<div class="congestion-icon severe">!</div>',
@@ -432,7 +472,7 @@
 
             const html = level === 'severe' ? congestionIconHtml.severe
                 : level === 'moderate' ? congestionIconHtml.moderate
-                : congestionIconHtml.light甚至;
+                : congestionIconHtml.light;
             const icon = L.divIcon({
                 className: '',
                 html: html,
@@ -495,7 +535,7 @@
                         ways.forEach(function (w) {
                             const nm = (w.tags && w.tags.name) ? w.tags.name : 'Jalan (tanpa nama)';
                             if (seen[nm]) return;
-                            seen[nm] = true19;
+                            seen[nm] = true;
                             drawCongestionAt(centerLat, centerLng, [w.center.lat, w.center.lon], null, nm);
                         });
                     })
@@ -539,22 +579,13 @@
             loadTomTomTraffic(c.lat, c.lng, zoom);
         }
 
-        Object.keys(categoryClusters).forEach(function (key) {
-            const loc = locations.find(function (l) {
-                return (l.category ? String(l.category.id) : 'none') === key;
-            });
-            const label = loc.category ? loc.category.name : 'Tanpa Kategori';
-            const color = loc.category ? loc.category.color : '#9ca3af';
-
-            overlays[label] = categoryClusters[key];
-            legendItems.push(`<i style="background:${color}"></i> ${label}`);
-            map.addLayer(categoryClusters[key]);
-        });
+        overlays['📍 Semua Lokasi'] = locationsLayer;
+        map.addLayer(locationsLayer);
 
         overlays['🚦 Kemacetan'] = congestionLayer;
         map.addLayer(congestionLayer);
 
-        L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(map);
+        L.control.layers(baseMaps, overlays, { collapsed: false, position: 'topright' }).addTo(map);
 
         const congestionLegend = [
             ['#e60000', 'Macet Parah'],
@@ -563,10 +594,25 @@
             ['#a4c3d3', 'Lancar']
         ];
 
+        // Legend: dedupe warna yang benar-benar dipakai marker, agar tidak
+        // memuat 40-an kategori provinsi yang saling tumpang tindih/warna sama.
+        const legendColors = [];
+        const legendRows = [];
+        locations.forEach(function (loc) {
+            if (!loc.category) return;
+            const c = loc.category.color || '#9ca3af';
+            if (legendColors.indexOf(c) !== -1) return;
+            legendColors.push(c);
+            const isPlaceType = PLACE_TYPES.indexOf(loc.category.name) !== -1;
+            legendRows.push(`<i style="background:${c}"></i> ${isPlaceType ? loc.category.name : 'Wilayah (kabupaten/kota)'}`);
+        });
+
         const legend = L.control({ position: 'bottomright' });
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'map-legend');
-            div.innerHTML = '<strong>Kategori</strong><br>' + legendItems.join('<br>')
+            div.innerHTML = '<strong>Lokasi</strong><br>'
+                + '<span class="cluster-sample"></span> Cluster (warna = kategori dominan, angka = jumlah lokasi, klik untuk zoom)<br>'
+                + legendRows.join('<br>')
                 + '<br><strong>Kemacetan</strong><br>'
                 + congestionLegend.map(function (x) {
                     return '<i class="road" style="background:' + x[0] + '"></i> ' + x[1];
