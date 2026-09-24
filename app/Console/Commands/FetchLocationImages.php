@@ -42,7 +42,8 @@ class FetchLocationImages extends Command
         $bar = $this->output->createProgressBar($locations->count());
         $bar->start();
 
-        $ok = $saved = $fail = 0;
+        $ok = $saved = $fail = $duplicateRejected = 0;
+        $usedHashes = $this->loadUsedHashes();
 
         foreach ($locations as $location) {
             try {
@@ -78,8 +79,20 @@ class FetchLocationImages extends Command
                     continue;
                 }
 
+                // Guard anti-duplikat: tolak kalau hash sudah dipakai lokasi LAIN
+                $hash = md5($body);
+                $existing = $usedHashes[$hash] ?? null;
+                if ($existing !== null && $existing !== $relative) {
+                    $duplicateRejected++;
+                    $fail++;
+                    $bar->advance();
+                    usleep(100_000);
+                    continue;
+                }
+
                 if (Storage::disk('public')->put($relative, $body)) {
                     $location->update(['photo' => $relative]);
+                    $usedHashes[$hash] = $relative;
                     $saved++;
                 } else {
                     $fail++;
@@ -101,10 +114,29 @@ class FetchLocationImages extends Command
                 ['Diproses', $ok],
                 ['Foto tersimpan', $saved],
                 ['Tanpa foto / gagal', $fail],
+                ['Duplikat ditolak', $duplicateRejected],
             ]
         );
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Peta md5 -> path untuk semua foto yang sudah tersimpan,
+     * sebagai basis guard anti duplikat antar lokasi.
+     */
+    protected function loadUsedHashes(): array
+    {
+        $map = [];
+        $files = Storage::disk('public')->allFiles('location_photos');
+        foreach ($files as $path) {
+            try {
+                $map[md5(Storage::disk('public')->get($path))] = $path;
+            } catch (\Throwable $e) {
+                // abaikan file yang gagal dibaca
+            }
+        }
+        return $map;
     }
 
     protected function fetchThumbnail(string $name): ?string
