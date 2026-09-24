@@ -97,11 +97,13 @@ class DashboardController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Location growth trend
-        $locationTrend = Location::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('count(*) as total')
-        )
+        // Location growth trend (DB::table agar tidak ter-hydrate sebagai model Location
+        // yang memicu accessor photo_display saat di-json_encode)
+        $locationTrend = DB::table('locations')
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('count(*) as total')
+            )
             ->where('created_at', '>=', $startDate)
             ->groupBy('date')
             ->orderBy('date')

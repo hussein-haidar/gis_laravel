@@ -23,3 +23,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Kredensial akun lokal (jangan di-commit)
+/AKUN_LOGIN.md

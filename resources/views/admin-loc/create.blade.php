@@ -9,7 +9,7 @@
         <div class="card-body">
             <form action="{{ route('admin.locations.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                @include('admin-loc._form')
+                @include('admin-loc._form', ['location' => $location ?? new \App\Models\Location()])
             </form>
         </div>
     </div>
