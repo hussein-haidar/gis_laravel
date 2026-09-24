@@ -192,41 +192,6 @@ class FetchLocationImages extends Command
             '00b15844dd1502a052c89154192c3aba',  // 69239 bytes
             '71f29a9e60ea54c8f0060a030f3f5539',  // 93665 bytes
         ];
-            // 132428 bytes - foto "Air Terjun/Bandar Udara kecil" generik (PNG)
-            '4263d250a42db511b33fb5c84ec72991',
-            // 207874 bytes
-            'df40b62e0ac8f9cdbc5716e0fd3ceebe',
-            // 149552 bytes
-            '869adce06b678a56b8672392151b3968',
-            // 104360 bytes
-            '3078424bf37b44895359c1fdc8d90bd0',
-            // 659841 bytes
-            'b394803f37feccb0815dc4ce39a97f76',
-            // 63963 bytes
-            '8db2ea71db5e5cf220b3d7f90218b8df',
-            // 91334 bytes
-            '12d9476c4a3f5c21051cfa371d38c25d',
-            // 1005702 bytes
-            'e94a58455707146c515315043ae7488b',
-            // 196085 bytes
-            '450e7e194fd0f726300534528f543926',
-            // 178405 bytes
-            'e49d7f474e53c3535b8d550a67299c1b',
-            // 294274 bytes
-            '68144d8ccf622c04cf6de429b2ccddd9',
-            // 175080 bytes
-            'ff1a8407c53e6089d1b9bb8c044f2783',
-            // 128108 bytes
-            'b2b7cc4cfc3d0da8e1733dcc68550b0c',
-            // 85961 bytes
-            '6bdaec2f89da7c8ee41f3a5a711bde67',
-            // 192424 bytes
-            '1234ac1b593f973c72f1ca8e8bf5b79b',
-            // 159016 bytes
-            'e503eeb15f7aa56bab8f3f3a303b7eeb',
-            // 188383 bytes
-            'e70e364e1ebdaf840a8763dde4ab1a51',
-        ];
         return in_array($hash, $genericHashes, true);
     }
 
