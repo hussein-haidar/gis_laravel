@@ -199,4 +199,29 @@ class AuthController extends Controller
             ->route('admin.locations.index')
             ->with('success', 'Password berhasil diganti.');
     }
+
+    public function showProfile(): View
+    {
+        return view('admin.profile', ['user' => auth()->user()]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+        ]);
+
+        if ($request->hasFile('avatar')) {
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar'] = $path;
+        }
+
+        $user->update($data);
+
+        return back()->with('success', 'Profil berhasil diperbarui.');
+    }
 }

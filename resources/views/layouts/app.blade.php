@@ -99,6 +99,8 @@
                                 <li><a class="dropdown-item" href="{{ route('super-admin.activity-log') }}">Log Aktivitas</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
                                 <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ route('super-admin.profile') }}"><i class="bi bi-person me-2"></i> Profil</a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.password.form') }}">Ganti Password</a></li>
                             </ul>
                         </li>
@@ -120,6 +122,8 @@
                                 <li><a class="dropdown-item" href="{{ route('admin.reviews.index') }}">Moderasi Review</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ route('admin.profile') }}"><i class="bi bi-person me-2"></i> Profil</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.password.form') }}">Ganti Password</a></li>
                             </ul>

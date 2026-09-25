@@ -67,6 +67,9 @@ Route::middleware(['auth', 'role:super_admin'])->prefix('super-admin')->name('su
     Route::get('password', [AuthController::class, 'showPasswordForm'])->name('password.form');
     Route::post('password', [AuthController::class, 'changePassword'])->name('password.update');
 
+    Route::get('profile', [AuthController::class, 'showProfile'])->name('profile');
+    Route::post('profile', [AuthController::class, 'updateProfile'])->name('profile.update');
+
     Route::resource('users', \App\Http\Controllers\SuperAdmin\UserController::class)->except(['show']);
     Route::get('activity-log', [\App\Http\Controllers\SuperAdmin\ActivityLogController::class, 'index'])->name('activity-log');
 
@@ -96,6 +99,9 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
 
     Route::get('password', [AuthController::class, 'showPasswordForm'])->name('password.form');
     Route::post('password', [AuthController::class, 'changePassword'])->name('password.update');
+
+    Route::get('profile', [AuthController::class, 'showProfile'])->name('profile');
+    Route::post('profile', [AuthController::class, 'updateProfile'])->name('profile.update');
 
     Route::resource('locations', \App\Http\Controllers\Admin\LocationController::class)->except(['show']);
     Route::post('locations/bulk-delete', [\App\Http\Controllers\Admin\LocationController::class, 'bulkDelete'])->name('locations.bulk-delete');
