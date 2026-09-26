@@ -1,0 +1,17 @@
+# =====================================================================
+# File: public/storage/.htaccess
+# Upload sebagai storage.htaccess.txt di /public_html/public/
+# lalu RENAME jadi .htaccess DAN buat folder /public/storage/
+#
+# Alternatif pengganti symlink `php artisan storage:link`
+# (cPanel free tidak punya SSH), biar foto bisa diakses:
+#   http://gisproyek.co4.in/storage/location_photos/xxx.jpg
+#
+# CARA: buat folder public/storage di File Manager, upload file ini
+# sebagai .htaccess di dalamnya.
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ ../../storage/app/public/$1 [L]
+</IfModule>

@@ -1,0 +1,16 @@
+# =====================================================================
+# File: /.htaccess (di PUBLIC_HTML root)
+# Upload sebagai root_htaccess.txt lalu RENAME jadi .htaccess
+# Lokasi di server: /public_html/.htaccess
+#
+# Ini mengarahkan semua request ke folder public/ Laravel,
+# sehingga domain gisproyek.co4.in langsung masuk ke aplikasi.
+# (tanpa perlu .htaccess ini, user harus akses gisproyek.co4.in/public)
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Redirect semua ke /public
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

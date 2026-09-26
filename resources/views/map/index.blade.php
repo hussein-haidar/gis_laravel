@@ -33,7 +33,10 @@
             background: #fff; padding: 8px 12px;
             border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
             font-size: 13px; line-height: 1.7;
-            margin-bottom: 30px;
+            margin-bottom: 8px;
+            max-width: 270px;
+            max-height: 62vh;
+            overflow-y: auto;
         }
         .map-legend i {
             width: 12px; height: 12px;
@@ -232,6 +235,9 @@
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '&copy; OpenStreetMap'
         });
+        const darkTiles = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19, attribution: '&copy; Esri, OpenStreetMap'
+        });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19, attribution: '&copy; Esri'
         });
@@ -239,11 +245,30 @@
             maxZoom: 17, attribution: '&copy; OpenTopoMap'
         });
 
+        const isDarkTheme = function () {
+            return document.documentElement.getAttribute('data-theme') === 'dark';
+        };
+
+        // Basemap default: ikuti tema. Dark mode => peta gelap (anti silau),
+        // light mode => OpenStreetMap standar.
+        const initialBase = isDarkTheme() ? darkTiles : osm;
         const map = L.map('map', {
-            layers: [osm],
+            layers: [initialBase],
             minZoom: 2,
             maxBounds: [[-85.06, -180], [85.06, 180]],
         }).setView([-2.5489, 118.0149], 5);
+
+        // Ganti basemap otomatis saat user toggle dark/light.
+        let currentBase = initialBase;
+        function applyThemeBase() {
+            const dark = isDarkTheme();
+            const target = dark ? darkTiles : osm;
+            if (target === currentBase) return;
+            if (map.hasLayer(currentBase)) map.removeLayer(currentBase);
+            map.addLayer(target);
+            currentBase = target;
+        }
+        new MutationObserver(applyThemeBase).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
         //         const map = L.map('map', { layers: [osm], contextmenu: true, contextmenuWidth: 200, minZoom: 2, worldCopyJump: true, maxBounds: [[-85.06, -180], [85.06, 180]]         }).setView([-2.5489, 118.0149], 5);
 
@@ -257,6 +282,7 @@
 
         const baseMaps = {
             '🗺️ OpenStreetMap': osm,
+            '🌑 Dark': darkTiles,
             '🛰️ Satelit': satellite,
             '⛰️ Terrain': terrain,
         };
@@ -303,7 +329,7 @@
         });
 
         const locationsLayer = L.markerClusterGroup({
-            maxClusterRadius: 42,
+            maxClusterRadius: 80,
             showCoverageOnHover: false,
             iconCreateFunction: function (cluster) {
                 const children = cluster.getAllChildMarkers();
@@ -585,7 +611,7 @@
         overlays['🚦 Kemacetan'] = congestionLayer;
         map.addLayer(congestionLayer);
 
-        L.control.layers(baseMaps, overlays, { collapsed: false, position: 'topright' }).addTo(map);
+        L.control.layers(baseMaps, overlays, { collapsed: true, autoZIndex: false, position: 'topright' }).addTo(map);
 
         const congestionLegend = [
             ['#e60000', 'Macet Parah'],
@@ -607,7 +633,7 @@
             legendRows.push(`<i style="background:${c}"></i> ${isPlaceType ? loc.category.name : 'Wilayah (kabupaten/kota)'}`);
         });
 
-        const legend = L.control({ position: 'bottomright' });
+        const legend = L.control({ position: 'bottomleft' });
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'map-legend');
             div.innerHTML = '<strong>Lokasi</strong><br>'
