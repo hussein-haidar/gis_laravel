@@ -19,6 +19,7 @@ class PlaceholderController extends Controller
         $initial = mb_strtoupper(mb_substr(preg_replace('/[^\p{L}\p{N}\s]/u', '', $name), 0, 1)) ?: '?';
         $short = mb_strimwidth($name, 0, 30, '…');
         $escName = e($short);
+        $iconPath = $this->categoryIconPath($categoryName);
 
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="260" viewBox="0 0 640 260">'
             . '<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
