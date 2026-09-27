@@ -6,20 +6,23 @@
     <style>
         #map {
             height: clamp(320px, 46vh, 460px);
+            min-height: 320px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
+        .card-body { flex: 1 1 auto; min-height: 0; }
         .detail-photo {
             width: 100%; max-height: 340px;
             object-fit: cover; border-radius: 8px;
         }
         .card { position: relative; z-index: 1; }
         .review-section { position: relative; z-index: 2; }
-        .nearest-section { position: relative; z-index: 2; }
+        .nearest-section { position: relative; z-index: 2; margin-top: 3rem; }
         .info-label {
             font-size: 0.78rem; text-transform: uppercase;
-            letter-spacing: 0.04em; color: #6b7280; margin-bottom: 2px;
+            letter-spacing: 0.04em; color: #4b5563; margin-bottom: 2px; font-weight: 600;
         }
+        .badge { font-weight: 500; padding: 0.4em 0.7em; }
         .custom-marker .pin {
             width: 30px; height: 30px;
             border-radius: 50% 50% 50% 0;
@@ -32,6 +35,8 @@
             transition: box-shadow 0.15s ease;
         }
         .nearest-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .nearest-card .card-body { display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
+        .nearest-card h3.h6 { line-height: 1.3; }
 
         .nav-overlay {
             position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
@@ -258,7 +263,7 @@
                     </h1>
 
                     @if ($location->category)
-                        <span class="badge text-white mb-3" style="background:{{ $location->category->color }}">{{ $location->category->name }}</span>
+                        <span class="badge text-white mb-3" style="background:{{ $location->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $location->category->name }}</span>
                     @endif
 
                     @if ($location->description)
@@ -277,10 +282,6 @@
                         <div class="col-sm-6">
                             <div class="info-label">{{ __('messages.added_on') }}</div>
                             <div>{{ $location->created_at->format('d M Y') }}</div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="info-label">{{ __('messages.category') }}</div>
-                            <div>{{ $location->category?->name ?? '-' }}</div>
                         </div>
                         @if ($location->geometry)
                             <div class="col-sm-12">
@@ -489,7 +490,7 @@
                             <div class="card-body">
                                 <h3 class="h6 mb-1">{{ $item['location']->name }}</h3>
                                 @if ($item['location']->category)
-                                    <span class="badge text-white mb-2" style="background:{{ $item['location']->category->color }}">{{ $item['location']->category->name }}</span>
+                                    <span class="badge text-white mb-2" style="background:{{ $item['location']->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $item['location']->category->name }}</span>
                                 @endif
                                 <div class="small text-muted">≈ {{ number_format($item['distance'], 1, ',', '.') }} km</div>
                             </div>
@@ -523,6 +524,7 @@
         map.setMinZoom(2);
         map.options.worldCopyJump = false;
         L.control.scale({ imperial: false }).addTo(map);
+        setTimeout(() => map.invalidateSize(), 100);
 
         function getTrafficSeverity() {
             const h = new Date().getHours();
