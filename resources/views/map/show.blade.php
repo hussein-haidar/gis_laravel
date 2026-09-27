@@ -11,7 +11,34 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
+        #map-card { min-height: 400px; }
         .card-body { flex: 1 1 auto; min-height: 0; }
+        .vehicle-btn {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+            background: #fff;
+            transition: all 0.15s ease;
+        }
+        .vehicle-btn:hover {
+            border-color: #93c5fd;
+            background: #eff6ff;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(59,130,246,0.2);
+        }
+        .vehicle-btn.active {
+            border-color: #2563eb;
+            background: #dbeafe;
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+        }
+        .vehicle-btn svg {
+            width: 20px;
+            height: 20px;
+        }
         .detail-photo {
             width: 100%; max-height: 320px;
             object-fit: cover; border-radius: 8px;
@@ -444,7 +471,7 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <div class="info-label mb-1">{{ __('messages.vehicle_type') }}</div>
-                        <div class="vehicle-picker d-flex flex-wrap gap-2" id="vehicle-picker">
+                        <div class="vehicle-picker d-flex flex-wrap gap-2 justify-content-center" id="vehicle-picker">
                             <button type="button" class="vehicle-btn active" data-vehicle="mobil" title="Mobil">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.6-.4-1-1-1h-23c-.6 0-1 .4-1 1v3c0 .6.4 1 1 1h2"/><circle cx="8" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg>
                             </button>
@@ -543,7 +570,8 @@
         map.setMinZoom(2);
         map.options.worldCopyJump = false;
         L.control.scale({ imperial: false }).addTo(map);
-        setTimeout(() => map.invalidateSize(), 100);
+        setTimeout(() => map.invalidateSize(), 300);
+        setTimeout(() => map.invalidateSize(), 800);
 
         function getTrafficSeverity() {
             const h = new Date().getHours();
