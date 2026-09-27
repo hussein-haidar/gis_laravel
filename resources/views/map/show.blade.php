@@ -477,7 +477,7 @@
     </div>
 
     @if ($nearest->isNotEmpty())
-        <div class="mt-4">
+        <div class="mt-5 pt-4 border-top">
             <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
                 @foreach ($nearest as $item)
@@ -628,23 +628,29 @@
             const sub = document.getElementById('traffic-list-sub');
             const count = document.getElementById('traffic-count');
 
-            if (!congestionItems.length) {
+            // "Daftar Jalan MACET" — hanya tingkat moderate & severe yang masuk.
+            // Level light/lancar bukan jalan macet, jangan dihitung/ditampilkan.
+            const congested = congestionItems.filter(function (it) {
+                return it.level === 'severe' || it.level === 'moderate';
+            });
+
+            if (!congested.length) {
                 list.innerHTML = '<div class="text-muted small">Tidak ada jalan yang macet di area ini.</div>';
-                if (sub) sub.textContent = 'Data kosong (di luar cakupan / laut).';
+                if (sub) sub.textContent = 'Data kosong (jalur lancar / di luar cakupan).';
                 if (count) count.style.display = 'none';
                 return;
             }
 
-            // Urutkan ringan -> berat, lalu abjad.
-            const sorted = congestionItems.slice().sort(function (a, b) {
+            // Urutkan berat -> ringan lalu abjad.
+            const sorted = congested.slice().sort(function (a, b) {
                 if (LEVEL_RANK[a.level] !== LEVEL_RANK[b.level]) {
-                    return LEVEL_RANK[a.level] - LEVEL_RANK[b.level];
+                    return LEVEL_RANK[b.level] - LEVEL_RANK[a.level];
                 }
                 return a.name.localeCompare(b.name);
             });
 
             if (count) { count.textContent = sorted.length; count.style.display = 'inline-block'; }
-            if (sub) sub.textContent = 'Urut: ringan → berat. Klik baris untuk fokus ke jalan.';
+            if (sub) sub.textContent = 'Urut: berat → ringan. Klik baris untuk fokus ke jalan.';
 
             list.innerHTML = '';
             sorted.forEach(function (item) {
