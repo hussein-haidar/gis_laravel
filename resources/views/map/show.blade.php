@@ -272,7 +272,7 @@
                     </h1>
 
                     @if ($location->category)
-                        <span class="badge text-white mb-3" style="background:{{ $location->category->color }}; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">{{ $location->category->name }}</span>
+                        <span class="badge text-white mb-3 px-3 py-2" style="background:{{ $location->category->color }}; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">{{ $location->category->name }}</span>
                     @endif
 
                     @if ($location->description)
@@ -306,7 +306,7 @@
                     </div>
 
                     @if ($ratingCount > 0)
-                        <div class="mt-4 border-top pt-3 d-flex align-items-center gap-3">
+                        <div class="mt-5 border-top pt-4 d-flex align-items-center gap-3">
                             <div class="text-center">
                                 <div class="fs-2 fw-bold text-warning">{{ number_format((float) $avgRating, 1, ',', '.') }}</div>
                                 <div class="small">{{ __('messages.review_count', ['count' => $ratingCount]) }}</div>
@@ -323,7 +323,7 @@
                     @endif
 
                     {{-- Ulasan & Rating (di kolom kiri, setelah alamat & ringkasan rating) --}}
-                    <div class="card mt-3 review-section">
+                    <div class="card mt-4 review-section">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
                             <span class="badge bg-secondary">{{ $reviews->count() }}</span>
@@ -389,8 +389,9 @@
                                     </button>
                                 </form>
                             @else
-                                <div class="text-muted small">
-                                    <a href="{{ route('login') }}">{{ __('messages.nav_login') }}</a> {{ __('messages.login_to_review') }}
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <a href="{{ route('login') }}" class="btn btn-sm btn-outline-primary">{{ __('messages.nav_login') }}</a>
+                                    <span class="text-muted small">{{ __('messages.login_to_review') }}</span>
                                 </div>
                             @endauth
                         </div>
@@ -444,12 +445,24 @@
                     <div class="mb-3">
                         <div class="info-label mb-1">{{ __('messages.vehicle_type') }}</div>
                         <div class="vehicle-picker d-flex flex-wrap gap-2" id="vehicle-picker">
-                            <button type="button" class="vehicle-btn active" data-vehicle="mobil" data-icon="🚗" title="Mobil">🚗</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="motor" data-icon="🏍️" title="Motor">🏍️</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="sepeda" data-icon="🚲" title="Sepeda">🚲</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="bis" data-icon="🚌" title="Bis">🚌</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="truk_sedang" data-icon="🚚" title="Truk Sedang">🚚</button>
-                            <button type="button" class="vehicle-btn" data-vehicle="truk_besar" data-icon="🚛" title="Truk Besar">🚛</button>
+                            <button type="button" class="vehicle-btn active" data-vehicle="mobil" title="Mobil">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.6-.4-1-1-1h-23c-.6 0-1 .4-1 1v3c0 .6.4 1 1 1h2"/><circle cx="8" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg>
+                            </button>
+                            <button type="button" class="vehicle-btn" data-vehicle="motor" title="Motor">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M14 17h-3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3"/></svg>
+                            </button>
+                            <button type="button" class="vehicle-btn" data-vehicle="sepeda" title="Sepeda">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="17" r="2"/><circle cx="6" cy="17" r="2"/><path d="M6 17V5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v12"/><line x1="6" y1="17" x2="6" y2="5"/><line x1="18" y1="17" x2="18" y2="5"/></svg>
+                            </button>
+                            <button type="button" class="vehicle-btn" data-vehicle="bis" title="Bis">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><line x1="8" y1="5" x2="8" y2="19"/></svg>
+                            </button>
+                            <button type="button" class="vehicle-btn" data-vehicle="truk_sedang" title="Truk Sedang">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="8" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>
+                            </button>
+                            <button type="button" class="vehicle-btn" data-vehicle="truk_besar" title="Truk Besar">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><rect x="10" y="5" width="4" height="6"/></svg>
+                            </button>
                         </div>
                         <div class="text-muted small mt-1" id="vehicle-label">Mobil</div>
                     </div>
@@ -496,7 +509,7 @@
                             <div class="card-body">
                                 <h3 class="h6 mb-1">{{ $item['location']->name }}</h3>
                                 @if ($item['location']->category)
-                                    <span class="badge text-white mb-2" style="background:{{ $item['location']->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $item['location']->category->name }}</span>
+                                    <span class="badge text-white mb-2 px-3 py-2" style="background:{{ $item['location']->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $item['location']->category->name }}</span>
                                 @endif
                                 <div class="small text-muted">≈ {{ number_format($item['distance'], 1, ',', '.') }} km</div>
                             </div>

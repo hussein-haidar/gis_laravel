@@ -223,7 +223,7 @@
                     <div class="card-body">
                         <h3 class="h6 mb-1">{{ $location->name }}</h3>
                         @if ($location->category)
-                            <span class="badge text-white mb-2" style="background:{{ $location->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $location->category->name }}</span>
+                            <span class="badge text-white mb-2 px-3 py-2" style="background:{{ $location->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $location->category->name }}</span>
                         @endif
                         <p class="small text-muted mb-0">{{ Str::limit($location->description, 80) }}</p>
                     </div>
