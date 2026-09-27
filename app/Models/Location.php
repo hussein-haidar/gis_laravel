@@ -71,7 +71,9 @@ class Location extends Model
 
     public function getPhotoUrlAttribute(): ?string
     {
-        return $this->photo ? asset('storage/' . $this->photo) : null;
+        if (empty($this->photo)) return null;
+        $path = storage_path('app/public/' . $this->photo);
+        return file_exists($path) ? asset('storage/' . $this->photo) : null;
     }
 
     public function getPhotoDisplayAttribute(): string
