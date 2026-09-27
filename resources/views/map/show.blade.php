@@ -5,24 +5,26 @@
 @section('styles')
     <style>
         #map {
-            height: clamp(320px, 46vh, 460px);
-            min-height: 320px;
+            height: clamp(350px, 50vh, 500px);
+            min-height: 350px;
+            width: 100%;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .card-body { flex: 1 1 auto; min-height: 0; }
         .detail-photo {
-            width: 100%; max-height: 340px;
+            width: 100%; max-height: 320px;
             object-fit: cover; border-radius: 8px;
         }
         .card { position: relative; z-index: 1; }
         .review-section { position: relative; z-index: 2; }
-        .nearest-section { position: relative; z-index: 2; margin-top: 3rem; }
+        .nearest-section { position: relative; z-index: 2; margin-top: 2.5rem; }
         .info-label {
-            font-size: 0.78rem; text-transform: uppercase;
-            letter-spacing: 0.04em; color: #4b5563; margin-bottom: 2px; font-weight: 600;
+            font-size: 0.8rem; text-transform: uppercase;
+            letter-spacing: 0.05em; color: #374151; margin-bottom: 4px; font-weight: 600;
         }
-        .badge { font-weight: 500; padding: 0.4em 0.7em; }
+        .info-value { font-size: 0.9rem; color: #1f2937; font-weight: 500; }
+        .badge { font-weight: 600; padding: 0.5em 0.85em; font-size: 0.78rem; letter-spacing: 0.02em; }
         .custom-marker .pin {
             width: 30px; height: 30px;
             border-radius: 50% 50% 50% 0;
@@ -35,8 +37,15 @@
             transition: box-shadow 0.15s ease;
         }
         .nearest-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .nearest-card .card-body { display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
-        .nearest-card h3.h6 { line-height: 1.3; }
+        .nearest-card .card-body { display: flex; flex-direction: column; justify-content: space-between; min-height: 150px; }
+        .nearest-card h3.h6 { line-height: 1.35; margin-bottom: 0.5rem; }
+        .detail-photo { max-height: 300px; }
+        .card.h-100 { display: flex; flex-direction: column; }
+        .card-body.flex-grow-1 { display: flex; flex-direction: column; }
+        .address-container { min-height: 60px; }
+        #map-card { min-height: 400px; }
+        .fw-semibold { font-weight: 600 !important; }
+        .badge.text-white { text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 
         .nav-overlay {
             position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
@@ -246,7 +255,7 @@
     </nav>
 
     <div class="row g-4">
-        <div class="col-lg-7">
+        <div class="col-lg-8">
             <div class="card h-100">
                 <div class="card-body">
                     <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" class="detail-photo mb-3" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
@@ -263,35 +272,35 @@
                     </h1>
 
                     @if ($location->category)
-                        <span class="badge text-white mb-3" style="background:{{ $location->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $location->category->name }}</span>
+                        <span class="badge text-white mb-3" style="background:{{ $location->category->color }}; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">{{ $location->category->name }}</span>
                     @endif
 
                     @if ($location->description)
-                        <p class="mb-4">{{ $location->description }}</p>
+                        <p class="mb-4 text-muted">{{ $location->description }}</p>
                     @endif
 
                     <div class="row g-3 mt-1">
                         <div class="col-sm-6">
                             <div class="info-label">{{ __('messages.latitude') }}</div>
-                            <div class="fw-semibold">{{ $location->latitude }}</div>
+                            <div class="info-value">{{ $location->latitude }}</div>
                         </div>
                         <div class="col-sm-6">
                             <div class="info-label">{{ __('messages.longitude') }}</div>
-                            <div class="fw-semibold">{{ $location->longitude }}</div>
+                            <div class="info-value">{{ $location->longitude }}</div>
                         </div>
                         <div class="col-sm-6">
                             <div class="info-label">{{ __('messages.added_on') }}</div>
-                            <div>{{ $location->created_at->format('d M Y') }}</div>
+                            <div class="info-value">{{ $location->created_at->format('d M Y') }}</div>
                         </div>
                         @if ($location->geometry)
                             <div class="col-sm-12">
                                 <div class="info-label">{{ __('messages.geometry_type') }}</div>
-                                <div>{{ $location->geometry['type'] ?? '-' }}</div>
+                                <div class="info-value">{{ $location->geometry['type'] ?? '-' }}</div>
                             </div>
                         @endif
                     </div>
 
-                    <div class="mt-3" id="address-display">
+                    <div class="mt-3 address-container" id="address-display">
                         <div class="info-label">{{ __('messages.reverse_address') }}</div>
                         <div class="text-muted small" id="reverse-addr">{{ __('messages.loading_address') }}</div>
                     </div>
@@ -390,19 +399,16 @@
                 </div>
             </div>
 
-        <div class="col-lg-5">
-            <div class="card mb-3" id="map-card" style="position:relative;">
+        <div class="col-lg-4">
+            <div class="card mb-3 h-100" id="map-card" style="position:relative;">
                 <div class="nav-overlay" id="nav-overlay">
                     <button class="nav-close" id="nav-close-btn" title="{{ __('messages.stop_navigation') }}">&times;</button>
                     <div class="nav-step-text" id="nav-step-text">--</div>
                     <div class="nav-step-detail" id="nav-step-detail"></div>
                     <div class="nav-remaining" id="nav-remaining"></div>
                 </div>
-                <div class="card-body">
-                    <div class="d-none-fullscreen">
-                        <h2 class="h5 mb-3">{{ __('messages.location_on_map') }}</h2>
-                    </div>
-                    <div id="map"></div>
+                <div class="card-body d-flex flex-column">
+                    <div id="map" class="flex-grow-1"></div>
                     <div class="layer-badge" id="traffic-badge">⚠️ {{ __('messages.congestion_loading') }}</div>
 
                     <div class="fs-nav-panel">
