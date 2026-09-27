@@ -229,8 +229,12 @@
 
 @section('scripts')
     <script>
-        const locations = @json($locations);
+        // Lokasi TIDAK lagi di-inline ke HTML (bisa 10+ MB & memakan memory
+        // hosting free). Dimuat lewat API /api/geojson secara async — peta
+        // langsung tampil, marker menyusul saat data siap.
+        let allLocations = [];
         const PLACE_TYPES = {!! json_encode($categories->pluck('name')) !!};
+        const GEOJSON_URL = '{{ url('api/geojson') }}?compact=1' + (location.search ? location.search.replace(/^\?/, '&') : '');
 
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '&copy; OpenStreetMap'
@@ -362,38 +366,50 @@
         let heatLayer = null;
         let heatActive = false;
 
-        locations.forEach(function (loc) {
-            const color = loc.category ? loc.category.color : '#9ca3af';
+        // Data dari GET /api/geojson berupa FeatureCollection:
+        // { type:'FeatureCollection', features: [ { properties: { id,name,description,
+        //   category,category_color,photo_url }, geometry: { coordinates:[lng,lat] } } ] }
+        function renderLocations(fc) {
+            allLocations = (fc && fc.features) ? fc.features : [];
 
-            const icon = L.divIcon({
-                className: 'custom-marker',
-                html: `<div class="pin" style="background:${color}"></div>`,
-                iconSize: [26, 26], iconAnchor: [13, 26],
+            allLocations.forEach(function (feat) {
+                const p = feat.properties || {};
+                const lat = parseFloat(p.latitude);
+                const lng = parseFloat(p.longitude);
+
+                const color = p.category_color || '#9ca3af';
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div class="pin" style="background:${color}"></div>`,
+                    iconSize: [26, 26], iconAnchor: [13, 26],
+                });
+
+                const marker = L.marker([lat, lng], {
+                    icon: icon,
+                    placeColor: color,
+                    placeName: p.category || '',
+                });
+
+                const photo = p.photo_url
+                    ? `<img src="${p.photo_url}" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`
+                    : `<img src="${'{{ route('placeholder.show', ':id') }}'.replace(':id', p.id)}" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
+                const category = p.category
+                    ? `<span style="color:${color};font-weight:600">● ${p.category}</span><br>` : '';
+
+                marker.bindPopup(
+                    `${photo}<strong>${p.name}</strong><br>` + category +
+                    (p.description ? p.description + '<br>' : '') +
+                    `${lat}, ${lng}<br>` +
+                    `<a href="${'{{ route('map.show', ':id') }}'.replace(':id', p.id)}" class="small">{{ __('messages.view_detail') }} →</a>`
+                );
+
+                locationsLayer.addLayer(marker);
+                allMarkers.push(marker);
+                heatData.push([lat, lng, 0.5]);
             });
 
-            const marker = L.marker([parseFloat(loc.latitude), parseFloat(loc.longitude)], {
-                icon: icon,
-                placeColor: color,
-                placeName: loc.category ? loc.category.name : '',
-            });
-
-            const photo = loc.photo_url
-                ? `<img src="${loc.photo_url}" alt="${loc.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`
-                : `<img src="${'{{ route('placeholder.show', ':id') }}'.replace(':id', loc.id)}" alt="${loc.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
-            const category = loc.category
-                ? `<span style="color:${color};font-weight:600">● ${loc.category.name}</span><br>` : '';
-
-            marker.bindPopup(
-                `${photo}<strong>${loc.name}</strong><br>` + category +
-                (loc.description ? loc.description + '<br>' : '') +
-                `${loc.latitude}, ${loc.longitude}<br>` +
-                `<a href="${'{{ route('map.show', ':id') }}'.replace(':id', loc.id)}" class="small">{{ __('messages.view_detail') }} →</a>`
-            );
-
-            locationsLayer.addLayer(marker);
-            allMarkers.push(marker);
-            heatData.push([parseFloat(loc.latitude), parseFloat(loc.longitude), 0.5]);
-        });
+            buildLegend();
+        }
 
         const overlays = {};
 
@@ -613,6 +629,8 @@
 
         L.control.layers(baseMaps, overlays, { collapsed: true, autoZIndex: false, position: 'topright' }).addTo(map);
 
+        loadLocationsData();
+
         const congestionLegend = [
             ['#e60000', 'Macet Parah'],
             ['#e6b800', 'Padat'],
@@ -622,30 +640,45 @@
 
         // Legend: dedupe warna yang benar-benar dipakai marker, agar tidak
         // memuat 40-an kategori provinsi yang saling tumpang tindih/warna sama.
-        const legendColors = [];
-        const legendRows = [];
-        locations.forEach(function (loc) {
-            if (!loc.category) return;
-            const c = loc.category.color || '#9ca3af';
-            if (legendColors.indexOf(c) !== -1) return;
-            legendColors.push(c);
-            const isPlaceType = PLACE_TYPES.indexOf(loc.category.name) !== -1;
-            legendRows.push(`<i style="background:${c}"></i> ${isPlaceType ? loc.category.name : 'Wilayah (kabupaten/kota)'}`);
-        });
+        function buildLegend() {
+            const legendColors = [];
+            const legendRows = [];
+            allLocations.forEach(function (feat) {
+                const p = feat.properties || {};
+                if (!p.category_color) return;
+                const c = p.category_color;
+                if (legendColors.indexOf(c) !== -1) return;
+                legendColors.push(c);
+                const isPlaceType = PLACE_TYPES.indexOf(p.category) !== -1;
+                legendRows.push(`<i style="background:${c}"></i> ${isPlaceType ? p.category : 'Wilayah (kabupaten/kota)'}`);
+            });
 
-        const legend = L.control({ position: 'bottomleft' });
-        legend.onAdd = function () {
-            const div = L.DomUtil.create('div', 'map-legend');
-            div.innerHTML = '<strong>Lokasi</strong><br>'
-                + '<span class="cluster-sample"></span> Cluster (warna = kategori dominan, angka = jumlah lokasi, klik untuk zoom)<br>'
-                + legendRows.join('<br>')
-                + '<br><strong>Kemacetan</strong><br>'
-                + congestionLegend.map(function (x) {
-                    return '<i class="road" style="background:' + x[0] + '"></i> ' + x[1];
-                }).join('<br>');
-            return div;
-        };
-        legend.addTo(map);
+            const legend = L.control({ position: 'bottomleft' });
+            legend.onAdd = function () {
+                const div = L.DomUtil.create('div', 'map-legend');
+                div.innerHTML = '<strong>Lokasi</strong><br>'
+                    + '<span class="cluster-sample"></span> Cluster (warna = kategori dominan, angka = jumlah lokasi, klik untuk zoom)<br>'
+                    + legendRows.join('<br>')
+                    + '<br><strong>Kemacetan</strong><br>'
+                    + congestionLegend.map(function (x) {
+                        return '<i class="road" style="background:' + x[0] + '"></i> ' + x[1];
+                    }).join('<br>');
+                return div;
+            };
+            legend.addTo(map);
+        }
+
+        // Panggil render lokasi via API async. Kalau gagal (mis. memory/network),
+        // peta tetap tampil — hanya marker yang absen.
+        function loadLocationsData() {
+            fetch(GEOJSON_URL, { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(renderLocations)
+                .catch(function () {
+                    const mapEl = document.getElementById('map');
+                    if (mapEl) mapEl.insertAdjacentHTML('afterend', '<div class="small text-danger mt-1">Gagal memuat data lokasi dari server.</div>');
+                });
+        }
 
         map.on('moveend', loadCongestionForBounds);
         map.on('zoomend', loadCongestionForBounds);
@@ -774,11 +807,15 @@
             const suggId = (key === 'origin' ? 'route-from' : 'route-to') + '-suggest';
             const sugg = document.getElementById(suggId);
             const ql = q.toLowerCase();
-            const local = (locations || [])
-                .filter(function (l) { return l.name && l.name.toLowerCase().indexOf(ql) !== -1; })
+            const local = (allLocations || [])
+                .filter(function (feat) {
+                    const p = feat.properties || {};
+                    return p.name && p.name.toLowerCase().indexOf(ql) !== -1;
+                })
                 .slice(0, 8)
-                .map(function (l) {
-                    return { name: l.name, lat: parseFloat(l.latitude), lng: parseFloat(l.longitude), source: 'db', color: (l.category && l.category.color) || '#0d6efd' };
+                .map(function (feat) {
+                    const p = feat.properties || {};
+                    return { name: p.name, lat: parseFloat(p.latitude), lng: parseFloat(p.longitude), source: 'db', color: p.category_color || '#0d6efd' };
                 });
             if (local.length) { renderRouteSuggest(sugg, local, key); return; }
             rtNominatimSearch(q).then(function (res) {
