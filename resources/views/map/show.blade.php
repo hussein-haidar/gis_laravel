@@ -13,6 +13,9 @@
             width: 100%; max-height: 340px;
             object-fit: cover; border-radius: 8px;
         }
+        .card { position: relative; z-index: 1; }
+        .review-section { position: relative; z-index: 2; }
+        .nearest-section { position: relative; z-index: 2; }
         .info-label {
             font-size: 0.78rem; text-transform: uppercase;
             letter-spacing: 0.04em; color: #6b7280; margin-bottom: 2px;
@@ -312,7 +315,7 @@
             </div>
 
             {{-- Ulasan & Rating --}}
-            <div class="card mt-3">
+            <div class="card mt-3 review-section">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
                     <span class="badge bg-secondary">{{ $reviews->count() }}</span>
@@ -477,7 +480,7 @@
     </div>
 
     @if ($nearest->isNotEmpty())
-        <div class="mt-5 pt-4 border-top">
+        <div class="mt-5 pt-4 border-top nearest-section">
             <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
                 @foreach ($nearest as $item)
