@@ -312,82 +312,7 @@
                             </div>
                         </div>
                     @endif
-                </div>
-            </div>
-
-            {{-- Ulasan & Rating --}}
-            <div class="card mt-3 review-section">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
-                    <span class="badge bg-secondary">{{ $reviews->count() }}</span>
-                </div>
-                <div class="card-body">
-                    @if ($reviews->isEmpty())
-                        <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
-                    @else
-                        <div class="mb-4">
-                            @foreach ($reviews as $review)
-                                <div class="border-bottom py-2">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <span class="text-warning small">
-                                                @for ($i = 1; $i <= 5; $i++)
-                                                    {{ $i <= $review->rating ? '★' : '☆' }}
-                                                @endfor
-                                            </span>
-                                            <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
-                                        </div>
-                                        <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
-                                    </div>
-                                    @if ($review->title)
-                                        <div class="fw-semibold mt-1">{{ $review->title }}</div>
-                                    @endif
-                                    @if ($review->comment)
-                                        <div class="small text-muted mt-1">{{ $review->comment }}</div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @auth
-                        @if ($userReview && $userReview->status === 'pending')
-                            <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
-                        @endif
-                        <form action="{{ route('reviews.store', $location) }}" method="POST">
-                            @csrf
-                            <div class="mb-2">
-                                <label class="form-label small fw-semibold">Rating Anda</label>
-                                <div class="star-input d-flex" data-stars="5">
-                                    @for ($i = 1; $i <= 5; $i++)
-                                        <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
-                                                data-value="{{ $i }}" style="color:#d1d5db;">★</button>
-                                    @endfor
-                                    <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
-                                </div>
-                                @error('rating')
-                                    <div class="text-danger small">{{ $message }}</div>
-                                @enderror
-                            </div>
-                            <div class="mb-2">
-                                <input type="text" name="title" class="form-control form-control-sm"
-                                       placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
-                            </div>
-                            <div class="mb-2">
-                                <textarea name="comment" rows="3" class="form-control form-control-sm"
-                                          placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary">
-                                {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
-                            </button>
-                        </form>
-                    @else
-                        <div class="text-muted small">
-                            <a href="{{ route('login') }}">{{ __('messages.nav_login') }}</a> {{ __('messages.login_to_review') }}
-                        </div>
-                    @endauth
-                </div>
-            </div>
+</div>
         </div>
 
         <div class="col-lg-5">
@@ -476,6 +401,82 @@
                         <div class="text-muted small">{{ __('messages.searching_traffic') }}</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Ulasan & Rating (full-width, setelah grid) --}}
+    <div class="mt-5 pt-4 border-top review-section">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
+                <span class="badge bg-secondary">{{ $reviews->count() }}</span>
+            </div>
+            <div class="card-body">
+                @if ($reviews->isEmpty())
+                    <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
+                @else
+                    <div class="mb-4">
+                        @foreach ($reviews as $review)
+                            <div class="border-bottom py-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <span class="text-warning small">
+                                            @for ($i = 1; $i <= 5; $i++)
+                                                {{ $i <= $review->rating ? '★' : '☆' }}
+                                            @endfor
+                                        </span>
+                                        <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
+                                    </div>
+                                    <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
+                                </div>
+                                @if ($review->title)
+                                    <div class="fw-semibold mt-1">{{ $review->title }}</div>
+                                @endif
+                                @if ($review->comment)
+                                    <div class="small text-muted mt-1">{{ $review->comment }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @auth
+                    @if ($userReview && $userReview->status === 'pending')
+                        <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
+                    @endif
+                    <form action="{{ route('reviews.store', $location) }}" method="POST">
+                        @csrf
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Rating Anda</label>
+                            <div class="star-input d-flex" data-stars="5">
+                                @for ($i = 1; $i <= 5; $i++)
+                                    <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
+                                            data-value="{{ $i }}" style="color:#d1d5db;">★</button>
+                                @endfor
+                                <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
+                            </div>
+                            @error('rating')
+                                <div class="text-danger small">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" name="title" class="form-control form-control-sm"
+                                   placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
+                        </div>
+                        <div class="mb-2">
+                            <textarea name="comment" rows="3" class="form-control form-control-sm"
+                                      placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
+                        </button>
+                    </form>
+                @else
+                    <div class="text-muted small">
+                        <a href="{{ route('login') }}">{{ __('messages.nav_login') }}</a> {{ __('messages.login_to_review') }}
+                    </div>
+                @endauth
             </div>
         </div>
     </div>
