@@ -6,9 +6,11 @@
     <style>
         #map {
             height: clamp(420px, 62vh, 680px);
+            min-height: 400px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
+        .card-body { flex: 1 1 auto; min-height: 0; }
         .location-card {
             cursor: pointer;
             transition: box-shadow 0.15s ease, transform 0.15s ease;
@@ -22,6 +24,13 @@
             width: 100%; height: 130px;
             object-fit: cover; border-radius: 6px;
         }
+        .location-card .card-body { display: flex; flex-direction: column; min-height: 160px; }
+        .location-card .card-body h5 { line-height: 1.3; }
+        .info-label {
+            font-size: 0.78rem; text-transform: uppercase;
+            letter-spacing: 0.04em; color: #4b5563; margin-bottom: 2px; font-weight: 600;
+        }
+        .badge { font-weight: 500; padding: 0.4em 0.7em; }
         .custom-marker .pin {
             width: 26px; height: 26px;
             border-radius: 50% 50% 50% 0;
@@ -29,6 +38,9 @@
             border: 2px solid #fff;
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
+        .nearest-card .card-body { display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
+        .nearest-card h3.h6 { line-height: 1.3; }
+        .badge { font-weight: 500; padding: 0.4em 0.7em; }
         .map-legend {
             background: #fff; padding: 8px 12px;
             border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
@@ -211,7 +223,7 @@
                     <div class="card-body">
                         <h3 class="h6 mb-1">{{ $location->name }}</h3>
                         @if ($location->category)
-                            <span class="badge text-white mb-2" style="background:{{ $location->category->color }}">{{ $location->category->name }}</span>
+                            <span class="badge text-white mb-2" style="background:{{ $location->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $location->category->name }}</span>
                         @endif
                         <p class="small text-muted mb-0">{{ Str::limit($location->description, 80) }}</p>
                     </div>
@@ -261,6 +273,7 @@
             minZoom: 2,
             maxBounds: [[-85.06, -180], [85.06, 180]],
         }).setView([-2.5489, 118.0149], 5);
+        setTimeout(() => map.invalidateSize(), 100);
 
         // Ganti basemap otomatis saat user toggle dark/light.
         let currentBase = initialBase;
