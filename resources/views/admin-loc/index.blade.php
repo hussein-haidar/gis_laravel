@@ -188,7 +188,7 @@
                                 <td>{{ $locations->firstItem() + $index }}</td>
                                 <td>
                                     @if ($location->photo)
-                                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" class="location-thumb">
+                                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" class="location-thumb" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
@@ -283,8 +283,8 @@
 
             const marker = L.marker([parseFloat(location.latitude), parseFloat(location.longitude)], { icon: icon });
 
-            const photo = location.photo_url
-                ? `<img src="${location.photo_url}" style="width:160px;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>` : '';
+            const placeholderUrl = '{{ route('placeholder.show', ':id') }}'.replace(':id', location.id);
+            const photo = `<img src="${location.photo_url || placeholderUrl}" onerror="this.onerror=null;this.src='${placeholderUrl}'" style="width:160px;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
             const category = location.category
                 ? `<span style="color:${color};font-weight:600">● ${location.category.name}</span><br>` : '';
 

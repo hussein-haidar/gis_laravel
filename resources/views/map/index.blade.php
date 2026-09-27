@@ -207,7 +207,7 @@
         @forelse ($locations as $location)
             <div class="col">
                 <a href="{{ route('map.show', $location) }}" class="card location-card h-100 text-decoration-none text-dark">
-                    <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" loading="lazy">
+                    <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" loading="lazy" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
                     <div class="card-body">
                         <h3 class="h6 mb-1">{{ $location->name }}</h3>
                         @if ($location->category)
@@ -390,9 +390,8 @@
                     placeName: p.category || '',
                 });
 
-                const photo = p.photo_url
-                    ? `<img src="${p.photo_url}" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`
-                    : `<img src="${'{{ route('placeholder.show', ':id') }}'.replace(':id', p.id)}" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
+                const placeholderUrl = '{{ route('placeholder.show', ':id') }}'.replace(':id', p.id);
+                const photo = `<img src="${p.photo_url || placeholderUrl}" onerror="this.onerror=null;this.src='${placeholderUrl}'" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
                 const category = p.category
                     ? `<span style="color:${color};font-weight:600">● ${p.category}</span><br>` : '';
 

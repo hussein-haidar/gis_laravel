@@ -47,7 +47,8 @@
     @if (!empty($location->photo))
         <div class="mt-2">
             <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" id="photo-preview"
-                 style="width:160px;height:110px;object-fit:cover;border-radius:8px;">
+                 style="width:160px;height:110px;object-fit:cover;border-radius:8px;"
+                 onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
             <div class="form-text">Foto saat ini. Pilih file baru untuk menggantinya.</div>
         </div>
     @else
@@ -73,7 +74,8 @@
                         <div class="position-relative border rounded p-1">
                             <div class="drag-handle position-absolute top-0 start-0 m-1 bg-light rounded p-1" style="cursor:grab;z-index:10;" title="Seret untuk urutkan">☰</div>
                             <img src="{{ $photo->url }}" alt="{{ $photo->caption ?? $location->name }}"
-                                 class="img-fluid rounded" style="height:120px;object-fit:cover;">
+                                 class="img-fluid rounded" style="height:120px;object-fit:cover;"
+                                 onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
                             <div class="position-absolute top-0 end-0 m-1">
                                 <button type="button" class="btn btn-sm btn-danger btn-delete-photo" 
                                         data-id="{{ $photo->id }}" title="Hapus">×</button>
