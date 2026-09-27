@@ -73,6 +73,25 @@
         #map-card { min-height: 400px; }
         .fw-semibold { font-weight: 600 !important; }
         .badge.text-white { text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .nearest-scroll {
+            display: flex; gap: 1rem; overflow-x: auto;
+            scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+            padding-bottom: 0.5rem; margin-bottom: -0.5rem;
+        }
+        .nearest-scroll::-webkit-scrollbar { height: 6px; }
+        .nearest-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+        .nearest-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        .nearest-scroll-card {
+            width: 220px; scroll-snap-align: start; flex-shrink: 0;
+        }
+        .nearest-scroll-card .card { text-decoration: none; color: inherit; }
+        .nearest-scroll-card .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .nearest-scroll-card .card-body { min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
+        .nearest-scroll-card h3.h6 { line-height: 1.35; }
+        #map { min-height: 350px; }
+        @media (max-width: 991.98px) {
+            #map-card { min-height: 300px; }
+        }
 
         .nav-overlay {
             position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
@@ -348,87 +367,10 @@
                             </div>
 </div>
                     @endif
-
-                    {{-- Ulasan & Rating (di kolom kiri, setelah alamat & ringkasan rating) --}}
-                    <div class="card mt-4 review-section">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
-                            <span class="badge bg-secondary">{{ $reviews->count() }}</span>
-                        </div>
-                        <div class="card-body">
-                            @if ($reviews->isEmpty())
-                                <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
-                            @else
-                                <div class="mb-4">
-                                    @foreach ($reviews as $review)
-                                        <div class="border-bottom py-2">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <span class="text-warning small">
-                                                        @for ($i = 1; $i <= 5; $i++)
-                                                            {{ $i <= $review->rating ? '★' : '☆' }}
-                                                        @endfor
-                                                    </span>
-                                                    <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
-                                                </div>
-                                                <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
-                                            </div>
-                                            @if ($review->title)
-                                                <div class="fw-semibold mt-1">{{ $review->title }}</div>
-                                            @endif
-                                            @if ($review->comment)
-                                                <div class="small text-muted mt-1">{{ $review->comment }}</div>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endif
-
-                            @auth
-                                @if ($userReview && $userReview->status === 'pending')
-                                    <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
-                                @endif
-                                <form action="{{ route('reviews.store', $location) }}" method="POST">
-                                    @csrf
-                                    <div class="mb-2">
-                                        <label class="form-label small fw-semibold">Rating Anda</label>
-                                        <div class="star-input d-flex" data-stars="5">
-                                            @for ($i = 1; $i <= 5; $i++)
-                                                <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
-                                                        data-value="{{ $i }}" style="color:#d1d5db;">★</button>
-                                            @endfor
-                                            <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
-                                        </div>
-                                        @error('rating')
-                                            <div class="text-danger small">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="mb-2">
-                                        <input type="text" name="title" class="form-control form-control-sm"
-                                               placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
-                                    </div>
-                                    <div class="mb-2">
-                                        <textarea name="comment" rows="3" class="form-control form-control-sm"
-                                                  placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
-                                    </div>
-                                    <button type="submit" class="btn btn-sm btn-primary">
-                                        {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
-                                    </button>
-                                </form>
-                            @else
-                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <a href="{{ route('login') }}" class="btn btn-sm btn-outline-primary">{{ __('messages.nav_login') }}</a>
-                                    <span class="text-muted small">{{ __('messages.login_to_review') }}</span>
-                                </div>
-                            @endauth
-                        </div>
-                    </div>
-
                 </div>
             </div>
 
-        <div class="col-lg-4">
-            <div class="card mb-3 h-100" id="map-card" style="position:relative;">
+            <div class="card mb-3" id="map-card" style="position:relative;">
                 <div class="nav-overlay" id="nav-overlay">
                     <button class="nav-close" id="nav-close-btn" title="{{ __('messages.stop_navigation') }}">&times;</button>
                     <div class="nav-step-text" id="nav-step-text">--</div>
@@ -465,8 +407,10 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="card">
+        <div class="col-lg-4">
+            <div class="card mb-3">
                 <div class="card-header">{{ __('messages.route_to_this_location') }}</div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -508,7 +452,7 @@
                 </div>
             </div>
 
-            <div class="card mt-3">
+            <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span class="d-flex align-items-center">
                         <span>{{ __('messages.traffic_list_title') }}</span>
@@ -526,14 +470,92 @@
         </div>
     </div>
 
+    {{-- Ulasan & Rating (full-width, di bawah grid utama) --}}
+    <div class="mt-5 pt-4 border-top review-section">
+        <h2 class="h5 mb-3">{{ __('messages.reviews_title') }}</h2>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
+                <span class="badge bg-secondary">{{ $reviews->count() }}</span>
+            </div>
+            <div class="card-body">
+                @if ($reviews->isEmpty())
+                    <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
+                @else
+                    <div class="mb-4">
+                        @foreach ($reviews as $review)
+                            <div class="border-bottom py-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <span class="text-warning small">
+                                            @for ($i = 1; $i <= 5; $i++)
+                                                {{ $i <= $review->rating ? '★' : '☆' }}
+                                            @endfor
+                                        </span>
+                                        <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
+                                    </div>
+                                    <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
+                                </div>
+                                @if ($review->title)
+                                    <div class="fw-semibold mt-1">{{ $review->title }}</div>
+                                @endif
+                                @if ($review->comment)
+                                    <div class="small text-muted mt-1">{{ $review->comment }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @auth
+                    @if ($userReview && $userReview->status === 'pending')
+                        <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
+                    @endif
+                    <form action="{{ route('reviews.store', $location) }}" method="POST">
+                        @csrf
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Rating Anda</label>
+                            <div class="star-input d-flex" data-stars="5">
+                                @for ($i = 1; $i <= 5; $i++)
+                                    <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
+                                            data-value="{{ $i }}" style="color:#d1d5db;">★</button>
+                                @endfor
+                                <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
+                            </div>
+                            @error('rating')
+                                <div class="text-danger small">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" name="title" class="form-control form-control-sm"
+                                   placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
+                        </div>
+                        <div class="mb-2">
+                            <textarea name="comment" rows="3" class="form-control form-control-sm"
+                                      placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
+                        </button>
+                    </form>
+                @else
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <a href="{{ route('login') }}" class="btn btn-sm btn-outline-primary">{{ __('messages.nav_login') }}</a>
+                        <span class="text-muted small">{{ __('messages.login_to_review') }}</span>
+                    </div>
+                @endauth
+            </div>
+        </div>
+    </div>
+
     @if ($nearest->isNotEmpty())
         <div class="mt-5 pt-4 border-top nearest-section">
             <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
+            <div class="nearest-scroll d-flex gap-3 overflow-x-auto pb-2">
                 @foreach ($nearest as $item)
-                    <div class="col">
-                        <a href="{{ route('map.show', $item['location']) }}" class="card nearest-card h-100">
-                            <div class="card-body">
+                    <div class="nearest-scroll-card flex-shrink-0">
+                        <a href="{{ route('map.show', $item['location']) }}" class="card h-100">
+                            <div class="card-body text-center">
                                 <h3 class="h6 mb-1">{{ $item['location']->name }}</h3>
                                 @if ($item['location']->category)
                                     <span class="badge text-white mb-2 px-3 py-2" style="background:{{ $item['location']->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $item['location']->category->name }}</span>
@@ -570,8 +592,11 @@
         map.setMinZoom(2);
         map.options.worldCopyJump = false;
         L.control.scale({ imperial: false }).addTo(map);
-        setTimeout(() => map.invalidateSize(), 300);
-        setTimeout(() => map.invalidateSize(), 800);
+        setTimeout(() => map.invalidateSize(), 400);
+        setTimeout(() => map.invalidateSize(), 1000);
+        if (window.ResizeObserver) {
+            new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
+        }
 
         function getTrafficSeverity() {
             const h = new Date().getHours();
