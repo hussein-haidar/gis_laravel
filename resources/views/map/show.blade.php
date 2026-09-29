@@ -470,7 +470,28 @@
         </div>
     </div>
 
-    {{-- Ulasan & Rating (full-width, di bawah grid utama) --}}
+    @if ($nearest->isNotEmpty())
+        <div class="mt-5 pt-4 border-top nearest-section">
+            <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
+            <div class="nearest-scroll d-flex gap-3 overflow-x-auto pb-2">
+                @foreach ($nearest as $item)
+                    <div class="nearest-scroll-card flex-shrink-0">
+                        <a href="{{ route('map.show', $item['location']) }}" class="card h-100">
+                            <div class="card-body text-center">
+                                <h3 class="h6 mb-1">{{ $item['location']->name }}</h3>
+                                @if ($item['location']->category)
+                                    <span class="badge text-white mb-2 px-3 py-2" style="background:{{ $item['location']->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $item['location']->category->name }}</span>
+                                @endif
+                                <div class="small text-muted">≈ {{ number_format($item['distance'], 1, ',', '.') }} km</div>
+                            </div>
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    {{-- Ulasan & Rating (full-width, di bawah Lokasi Terdekat) --}}
     <div class="mt-5 pt-4 border-top review-section">
         <h2 class="h5 mb-3">{{ __('messages.reviews_title') }}</h2>
         <div class="card">
@@ -547,27 +568,6 @@
             </div>
         </div>
     </div>
-
-    @if ($nearest->isNotEmpty())
-        <div class="mt-5 pt-4 border-top nearest-section">
-            <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
-            <div class="nearest-scroll d-flex gap-3 overflow-x-auto pb-2">
-                @foreach ($nearest as $item)
-                    <div class="nearest-scroll-card flex-shrink-0">
-                        <a href="{{ route('map.show', $item['location']) }}" class="card h-100">
-                            <div class="card-body text-center">
-                                <h3 class="h6 mb-1">{{ $item['location']->name }}</h3>
-                                @if ($item['location']->category)
-                                    <span class="badge text-white mb-2 px-3 py-2" style="background:{{ $item['location']->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $item['location']->category->name }}</span>
-                                @endif
-                                <div class="small text-muted">≈ {{ number_format($item['distance'], 1, ',', '.') }} km</div>
-                            </div>
-                        </a>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    @endif
 @endsection
 
 @section('scripts')
