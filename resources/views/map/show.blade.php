@@ -13,6 +13,21 @@
         }
         #map-card { min-height: 400px; }
         .card-body { flex: 1 1 auto; min-height: 0; }
+        .sidebar-sticky {
+            position: -webkit-sticky;
+            position: sticky;
+            top: 1rem;
+        }
+        @media (max-width: 991.98px) {
+            .sidebar-sticky { position: static; }
+        }
+        .map-fallback {
+            position: absolute; inset: 0; z-index: 500;
+            display: none; align-items: center; justify-content: center;
+            background: #f8fafc; color: #64748b; font-size: 0.85rem;
+            text-align: center; padding: 1rem;
+        }
+        .map-fallback.active { display: flex; }
         .vehicle-btn {
             width: 44px;
             height: 44px;
@@ -379,6 +394,7 @@
                 </div>
                 <div class="card-body d-flex flex-column">
                     <div id="map" class="flex-grow-1"></div>
+                    <div class="map-fallback" id="map-fallback">Membuka peta lokasi...</div>
                     <div class="layer-badge" id="traffic-badge">⚠️ {{ __('messages.congestion_loading') }}</div>
 
                     <div class="fs-nav-panel">
@@ -410,6 +426,7 @@
         </div>
 
         <div class="col-lg-4">
+            <div class="sidebar-sticky">
             <div class="card mb-3">
                 <div class="card-header">{{ __('messages.route_to_this_location') }}</div>
                 <div class="card-body">
@@ -467,6 +484,7 @@
                     </div>
                 </div>
             </div>
+            </div>
         </div>
     </div>
 
@@ -493,12 +511,11 @@
 
     {{-- Ulasan & Rating (full-width, di bawah Lokasi Terdekat) --}}
     <div class="mt-5 pt-4 border-top review-section">
-        <h2 class="h5 mb-3">{{ __('messages.reviews_title') }}</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 m-0">{{ __('messages.reviews_title') }}</h2>
+            <span class="badge bg-secondary">{{ $reviews->count() }}</span>
+        </div>
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">{{ __('messages.reviews_title') }}</span>
-                <span class="badge bg-secondary">{{ $reviews->count() }}</span>
-            </div>
             <div class="card-body">
                 @if ($reviews->isEmpty())
                     <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
@@ -587,11 +604,35 @@
         const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
             maxZoom: 17, attribution: '&copy; OpenTopoMap'
         });
+        const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
+        });
+        let tileFail = 0;
+        osm.on('tileerror', function () {
+            tileFail++;
+            if (tileFail >= 6) {
+                map.removeLayer(osm);
+                carto.addTo(map);
+                const fb = document.getElementById('map-fallback');
+                if (fb) { fb.textContent = ''; fb.classList.remove('active'); }
+            }
+        });
+        carto.on('tileerror', function () { tileFail++; });
+        osm.on('tileload', function () { tileFail = Math.max(0, tileFail - 1); });
+        carto.on('tileload', function () {
+            const fb = document.getElementById('map-fallback');
+            if (fb) fb.classList.remove('active');
+        });
 
         const map = L.map('map', { layers: [osm] }).setView([lat, lng], 13);
         map.setMinZoom(2);
         map.options.worldCopyJump = false;
         L.control.scale({ imperial: false }).addTo(map);
+        const fbEl = document.getElementById('map-fallback');
+        if (fbEl) { fbEl.classList.add('active'); fbEl.textContent = 'Membuka peta lokasi...'; }
+        osm.once('load', function () { if (fbEl) { fbEl.classList.remove('active'); fbEl.textContent = ''; } });
+        carto.once('load', function () { if (fbEl) { fbEl.classList.remove('active'); fbEl.textContent = ''; } });
+        setTimeout(function () { if (fbEl && fbEl.classList.contains('active')) { fbEl.textContent = 'Peta sedang memuat. Jika kosong, coba muat ulang halaman.'; } }, 7000);
         setTimeout(() => map.invalidateSize(), 400);
         setTimeout(() => map.invalidateSize(), 1000);
         if (window.ResizeObserver) {
