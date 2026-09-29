@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'home' => 'Beranda',
     'nav_map' => 'Peta',
     'nav_navigation' => 'Navigasi',
     'nav_history' => 'Riwayat',
@@ -86,6 +87,9 @@ return [
     'review_count' => ':count ulasan',
     'review_avg_from_visitors' => 'Rating rata-rata dari pengunjung',
     'no_reviews' => 'Belum ada ulasan untuk lokasi ini. Jadilah yang pertama memberi ulasan!',
+    'no_reviews_yet' => 'Belum ada ulasan dari pengunjung',
+    'write_review' => 'Tulis Ulasan',
+    'user_reviews' => 'Ulasan Pengguna',
     'review_title_placeholder' => 'Judul singkat (opsional)',
     'review_comment_placeholder' => 'Bagaimana pendapat Anda tentang lokasi ini?',
     'submit_review' => 'Kirim Ulasan',
