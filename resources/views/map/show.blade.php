@@ -5,18 +5,27 @@
 @section('styles')
     <style>
         #map {
-            height: clamp(350px, 50vh, 500px);
-            min-height: 350px;
+            height: clamp(360px, 50vh, 520px);
+            min-height: 360px;
             width: 100%;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            position: relative;
         }
-        #map-card { min-height: 400px; }
+        #map-card {
+            min-height: 400px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        @media (max-width: 991.98px) {
+            #map-card { min-height: 320px; }
+        }
         .card-body { flex: 1 1 auto; min-height: 0; }
         .sidebar-sticky {
             position: -webkit-sticky;
             position: sticky;
-            top: 1rem;
+            top: 1.25rem;
+            z-index: 10;
         }
         @media (max-width: 991.98px) {
             .sidebar-sticky { position: static; }
@@ -29,14 +38,15 @@
         }
         .map-fallback.active { display: flex; }
         .vehicle-btn {
-            width: 44px;
-            height: 44px;
+            width: 46px;
+            height: 46px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
+            border-radius: 10px;
             border: 2px solid #e5e7eb;
             background: #fff;
+            cursor: pointer;
             transition: all 0.15s ease;
         }
         .vehicle-btn:hover {
@@ -46,21 +56,19 @@
             box-shadow: 0 2px 8px rgba(59,130,246,0.2);
         }
         .vehicle-btn.active {
-            border-color: #2563eb;
-            background: #dbeafe;
-            box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+            border-color: #f59e0b;
+            background: #fef3c7;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.35);
+            transform: scale(1.05);
         }
         .vehicle-btn svg {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
         }
         .detail-photo {
             width: 100%; max-height: 320px;
             object-fit: cover; border-radius: 8px;
         }
-        .card { position: relative; z-index: 1; }
-        .review-section { position: relative; z-index: 2; }
-        .nearest-section { position: relative; z-index: 2; margin-top: 2.5rem; }
         .info-label {
             font-size: 0.8rem; text-transform: uppercase;
             letter-spacing: 0.05em; color: #374151; margin-bottom: 4px; font-weight: 600;
@@ -81,11 +89,7 @@
         .nearest-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .nearest-card .card-body { display: flex; flex-direction: column; justify-content: space-between; min-height: 150px; }
         .nearest-card h3.h6 { line-height: 1.35; margin-bottom: 0.5rem; }
-        .detail-photo { max-height: 300px; }
-        .card.h-100 { display: flex; flex-direction: column; }
-        .card-body.flex-grow-1 { display: flex; flex-direction: column; }
-        .address-container { min-height: 60px; }
-        #map-card { min-height: 400px; }
+        .address-container { min-height: 48px; }
         .fw-semibold { font-weight: 600 !important; }
         .badge.text-white { text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
         .nearest-scroll {
@@ -103,10 +107,6 @@
         .nearest-scroll-card .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .nearest-scroll-card .card-body { min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
         .nearest-scroll-card h3.h6 { line-height: 1.35; }
-        #map { min-height: 350px; }
-        @media (max-width: 991.98px) {
-            #map-card { min-height: 300px; }
-        }
 
         .nav-overlay {
             position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
@@ -130,12 +130,7 @@
             cursor: pointer; font-size: 1rem; line-height: 28px; text-align: center;
         }
         .nav-overlay .nav-close:hover { background: rgba(255,255,255,0.35); }
-        #map { position: relative; }
 
-        #map-card {
-            position: relative;
-            transition: all 0.3s ease;
-        }
         #map-card.nav-fullscreen {
             position: fixed !important;
             inset: 0 !important;
@@ -269,18 +264,6 @@
             opacity: 0.45;
             text-decoration: line-through;
         }
-        .vehicle-btn {
-            width: 48px; height: 48px; border: 2px solid #e5e7eb;
-            border-radius: 12px; background: #fff; font-size: 1.5rem;
-            cursor: pointer; display: flex; align-items: center;
-            justify-content: center; transition: all 0.15s ease;
-        }
-        .vehicle-btn:hover { border-color: #93c5fd; background: #eff6ff; }
-        .vehicle-btn.active {
-            border-color: #f59e0b; background: #ffd166;
-            box-shadow: 0 0 0 3px rgba(245,158,11,0.45);
-            transform: scale(1.08);
-        }
         .blue-dot-nav {
             width: 36px; height: 36px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
@@ -318,7 +301,7 @@
 
     <div class="row g-4">
         <div class="col-lg-8">
-            <div class="card h-100">
+            <div class="card mb-4 shadow-sm border-0">
                 <div class="card-body">
                     <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" class="detail-photo mb-3" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
 
@@ -370,7 +353,7 @@
                 </div>
             </div>
 
-            <div class="card mb-3" id="map-card" style="position:relative;">
+            <div class="card mb-4 shadow-sm border-0" id="map-card">
                 <div class="nav-overlay" id="nav-overlay">
                     <button class="nav-close" id="nav-close-btn" title="{{ __('messages.stop_navigation') }}">&times;</button>
                     <div class="nav-step-text" id="nav-step-text">--</div>
@@ -412,7 +395,7 @@
 
         <div class="col-lg-4">
             <div class="sidebar-sticky">
-            <div class="card mb-3">
+            <div class="card mb-3 shadow-sm border-0">
                 <div class="card-header">{{ __('messages.route_to_this_location') }}</div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -454,7 +437,7 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card shadow-sm border-0">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span class="d-flex align-items-center">
                         <span>{{ __('messages.traffic_list_title') }}</span>
@@ -474,12 +457,12 @@
     </div>
 
     @if ($nearest->isNotEmpty())
-        <div class="mt-5 pt-4 border-top nearest-section">
+        <div class="mt-4 pt-4 border-top nearest-section">
             <h2 class="h5 mb-3">{{ __('messages.nearest_locations') }}</h2>
             <div class="nearest-scroll d-flex gap-3 overflow-x-auto pb-2">
                 @foreach ($nearest as $item)
                     <div class="nearest-scroll-card flex-shrink-0">
-                        <a href="{{ route('map.show', $item['location']) }}" class="card h-100">
+                        <a href="{{ route('map.show', $item['location']) }}" class="card h-100 shadow-sm border-0">
                             <div class="card-body text-center">
                                 <h3 class="h6 mb-1">{{ $item['location']->name }}</h3>
                                 @if ($item['location']->category)
@@ -495,10 +478,10 @@
     @endif
 
     {{-- Ulasan & Rating (full-width, di bawah Lokasi Terdekat) --}}
-    <div class="mt-5 pt-4 border-top review-section">
+    <div class="mt-4 pt-4 border-top review-section">
         <h2 class="h5 mb-3">{{ __('messages.reviews_title') }}</h2>
 
-        <div class="card mb-4">
+        <div class="card mb-4 shadow-sm border-0">
             <div class="card-body">
                 <div class="d-flex align-items-center justify-content-center flex-wrap gap-4 py-2">
                     <div class="text-center">
@@ -518,7 +501,7 @@
         </div>
 
         @auth
-            <div class="card mb-4">
+            <div class="card mb-4 shadow-sm border-0">
                 <div class="card-header fw-semibold">{{ $userReview ? __('messages.update_review') : __('messages.write_review') }}</div>
                 <div class="card-body">
                     @if ($userReview && $userReview->status === 'pending')
@@ -554,7 +537,7 @@
                 </div>
             </div>
         @else
-            <div class="card mb-4 text-center">
+            <div class="card mb-4 text-center shadow-sm border-0">
                 <div class="card-body py-4">
                     <p class="text-muted mb-3">{{ __('messages.login_to_review') }}</p>
                     <a href="{{ route('login') }}" class="btn btn-primary btn-lg">{{ __('messages.nav_login') }}</a>
@@ -562,7 +545,7 @@
             </div>
         @endauth
 
-        <div class="card">
+        <div class="card shadow-sm border-0">
             <div class="card-header fw-semibold">{{ __('messages.user_reviews') }} <span class="badge bg-secondary">{{ $reviews->count() }}</span></div>
             <div class="card-body">
                 @if ($reviews->isEmpty())
