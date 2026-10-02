@@ -1,10 +1,13 @@
-const CACHE_NAME = 'gis-pwa-v2';
+const CACHE_NAME = 'gis-pwa-v3';
+const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
 const APP_SHELL = [
-    '/',
-    '/manifest.webmanifest',
-    '/icons/icon-192.png',
-    '/icons/icon-512.png',
+    BASE + '/',
+    BASE + '/manifest.webmanifest',
+    BASE + '/icons/icon-192.png',
+    BASE + '/icons/icon-512.png',
 ];
+
+const fallbackPage = BASE + '/';
 
 const TILE_HOSTS = [
     'tile.openstreetmap.org',
@@ -51,7 +54,7 @@ self.addEventListener('fetch', function (event) {
                     return resp;
                 })
                 .catch(function () {
-                    return caches.match('/');
+                    return caches.match(fallbackPage);
                 })
         );
         return;

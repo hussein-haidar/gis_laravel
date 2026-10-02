@@ -19,6 +19,12 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- APP_URL lokal memakai subdirectory (/gis_laravel/public) yang membuat
+             route() di test menunjuk URL yang tidak ada. Pakai root polos. -->
+        <env name="APP_URL" value="http://localhost"/>
+        <!-- Kunci tetap supaya enkripsi setting secret bisa diuji tanpa
+             bergantung pada APP_KEY di .env lokal. -->
+        <env name="APP_KEY" value="base64:fAAujEZgj4gik2CMYZptDzxLsVnNka/vKGFnoT48bIU="/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

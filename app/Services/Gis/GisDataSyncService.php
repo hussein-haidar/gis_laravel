@@ -2,6 +2,7 @@
 
 namespace App\Services\Gis;
 
+use App\Jobs\FetchMissingLocationPhotos;
 use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\Location;
@@ -22,11 +23,13 @@ class GisDataSyncService
         'errors' => 0,
     ];
 
+    protected ?array $photoFetchStats = null;
+
     protected function getConfig(): array
     {
         return [
             'api_url' => Setting::getValue('gis_api_url'),
-            'api_key' => Setting::getValue('gis_api_key'),
+            'api_key' => Setting::credentialValue('gis_api_key'),
             'timeout' => Setting::getValue('gis_api_timeout', 30),
             'category_mapping' => [],
             'default_category' => 'Lainnya',
@@ -91,6 +94,8 @@ class GisDataSyncService
                     ->each
                     ->notify(new \App\Notifications\GisSyncStatus($this->stats));
             }
+
+            $this->fetchMissingPhotos();
 
             Log::info('GIS data sync completed', $this->stats);
         } catch (\Throwable $e) {
@@ -408,6 +413,72 @@ class GisDataSyncService
         return Category::firstOrCreate(['name' => $categoryName ?: $this->config['default_category']])->id;
     }
 
+    /**
+     * Setelah sinkronisasi, isi foto lokasi yang masih kosong memakai
+     * Openverse/Wikimedia Commons. Dijalankan sebagai queue job supaya halaman
+     * admin tidak menunggu unduhan gambar, dan lokasi yang tersisa diproses
+     * otomatis tanpa perlu menjalankan command.
+     */
+    protected function fetchMissingPhotos(): void
+    {
+        if (!config('services.openverse.auto_fetch_after_sync', true)) {
+            return;
+        }
+
+        $fetcher = new WikimediaPhotoFetcher();
+
+        $missing = $fetcher->locationsMissingPhoto();
+        if ($missing->isEmpty()) {
+            Log::info('No missing photos after GIS sync');
+            return;
+        }
+
+        $this->photoFetchStats = [
+            'attempted' => 0,
+            'success' => 0,
+            'remaining' => $missing->count(),
+            'queued' => false,
+        ];
+
+        if (config('services.openverse.queue_fetch', true)) {
+            FetchMissingLocationPhotos::dispatch();
+
+            $this->photoFetchStats['queued'] = true;
+
+            Log::info('Auto photo fetch queued after GIS sync', [
+                'pending' => $missing->count(),
+            ]);
+
+            return;
+        }
+
+        // Fallback sinkron (queue dimatikan): proses satu batch saja.
+        $limit = (int) config('services.openverse.auto_fetch_limit', 50);
+        $batch = $limit > 0 ? $missing->take($limit) : $missing;
+
+        $success = 0;
+        foreach ($batch as $loc) {
+            try {
+                if ($fetcher->fetchForLocation($loc)) {
+                    $success++;
+                }
+            } catch (\Throwable $e) {
+                Log::error('Auto photo fetch failed for ' . $loc->name . ': ' . $e->getMessage());
+            }
+
+            usleep((int) config('services.openverse.auto_fetch_sleep_ms', 1000) * 1000);
+        }
+
+        $this->photoFetchStats = [
+            'attempted' => $batch->count(),
+            'success' => $success,
+            'remaining' => max(0, $missing->count() - $batch->count()),
+            'queued' => false,
+        ];
+
+        Log::info('Auto photo fetch after GIS sync', $this->photoFetchStats);
+    }
+
     protected function downloadPhoto(mixed $photoValue): ?string
     {
         $url = trim((string) $photoValue);
@@ -468,6 +539,11 @@ class GisDataSyncService
     public function getStats(): array
     {
         return $this->stats;
+    }
+
+    public function lastPhotoFetchStats(): ?array
+    {
+        return $this->photoFetchStats;
     }
 
     protected function logActivity(string $type, ?array $oldValues, ?array $newValues, ?string $description = null): void

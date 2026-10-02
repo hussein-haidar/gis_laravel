@@ -14,6 +14,72 @@ class RoutingService
     }
 
     /**
+     * Ringkasan kesiapan tiap mesin routing untuk ditampilkan di halaman
+     * Pengaturan. Sengaja TIDAK memanggil API supaya halaman tetap cepat;
+     * state "unknown" berarti perlu diuji dengan `php artisan routing:doctor`.
+     *
+     * Value API key tidak pernah ikut dikembalikan, hanya asal-usulnya.
+     *
+     * @return array<string, array{label:string, state:string, note:string}>
+     */
+    public function status(): array
+    {
+        $localOn = (bool) Setting::getValue('osrm_local_enabled', false);
+        $publicOn = (bool) Setting::getValue('osrm_public_enabled', true);
+        $ghOn = (bool) Setting::getValue('graphhopper_enabled', false);
+        $ghKey = Setting::credential('graphhopper_api_key');
+        $ttKey = Setting::credential('tomtom_api_key');
+
+        $source = fn (array $c) => match ($c['source']) {
+            'database' => 'dari Pengaturan',
+            'env' => 'dari .env',
+            default => 'belum diisi',
+        };
+
+        if ($ghKey['value'] === '') {
+            $ghState = $ghOn ? 'needs_key' : 'off';
+            $ghNote = $ghOn
+                ? 'Aktif tetapi API key belum diisi, jadi mesin dilewati.'
+                : 'Nonaktif. Butuh API key; tanpa itu routing tetap jalan lewat OSRM publik.';
+        } elseif ($ghOn) {
+            $ghState = 'ready';
+            $ghNote = 'Siap dipakai. API key '.$source($ghKey).'.';
+        } else {
+            $ghState = 'off';
+            $ghNote = 'API key '.$source($ghKey).', tapi belum dinyalakan.';
+        }
+
+        return [
+            'osrm_local' => [
+                'label' => 'OSRM Lokal',
+                'state' => $localOn ? 'unknown' : 'off',
+                'note' => $localOn
+                    ? 'Aktif. Keadaan server lokal tidak bisa dicek tanpa memanggil API - jalankan `php artisan routing:doctor`.'
+                    : 'Nonaktif. Nyalakan hanya bila ada server OSRM di localhost.',
+            ],
+            'graphhopper' => [
+                'label' => 'GraphHopper',
+                'state' => $ghState,
+                'note' => $ghNote,
+            ],
+            'osrm_public' => [
+                'label' => 'OSRM Publik',
+                'state' => $publicOn ? 'ready' : 'off',
+                'note' => $publicOn
+                    ? 'Siap dipakai. Gratis dan tidak butuh API key, disarankan untuk instalasi baru.'
+                    : 'Nonaktif. Ini satu-satunya mesin yang selalu tersedia tanpa API key.',
+            ],
+            'tomtom' => [
+                'label' => 'TomTom',
+                'state' => $ttKey['value'] === '' ? 'needs_key' : 'ready',
+                'note' => $ttKey['value'] === ''
+                    ? 'Belum ada API key, jadi data kemacetan real-time tidak tersedia.'
+                    : 'Siap dipakai untuk "Hindari Kemacetan". API key '.$source($ttKey).'.',
+            ],
+        ];
+    }
+
+    /**
      * Hitung rute jalan antara dua titik.
      *
      * @param array $origin      [lat, lng]
@@ -112,20 +178,13 @@ class RoutingService
 
     protected function engineEnabled(string $key): bool
     {
-        $settingKey = match ($key) {
-            'osrm_local' => 'osrm_local_enabled',
-            'graphhopper' => 'graphhopper_enabled',
-            'osrm_public' => 'osrm_public_enabled',
-            'tomtom' => 'tomtom_api_key', // TomTom enabled if API key exists
-            default => null,
-        };
-
         if ($key === 'tomtom') {
-            return !empty(Setting::getValue('tomtom_api_key'));
+            return Setting::credentialValue('tomtom_api_key') !== '';
         }
 
         if ($key === 'graphhopper') {
-            return (bool) Setting::getValue('graphhopper_enabled', false) && !empty(Setting::getValue('graphhopper_api_key'));
+            return (bool) Setting::getValue('graphhopper_enabled', false)
+                && Setting::credentialValue('graphhopper_api_key') !== '';
         }
 
         if ($key === 'osrm_local') {
@@ -137,6 +196,39 @@ class RoutingService
         }
 
         return true;
+    }
+
+    /**
+     * Parameter mesin: nilai di database (dikelola admin lewat halaman
+     * settings) selalu menang, baru memakai config/.env sebagai cadangan.
+     *
+     * Sebelumnya request HTTP hanya membaca config, sehingga semua kolom
+     * URL/timeout di halaman settings tidak pernah benar-benar dipakai.
+     */
+    protected function engineSetting(string $settingKey, $fallback = null)
+    {
+        $setting = Setting::query()->where('key', $settingKey)->first();
+
+        if (! $setting) {
+            return $fallback;
+        }
+
+        // Kosong dicek dari nilai yang tersimpan, bukan dari hasil casting:
+        // setting bertipe integer yang dikosongkan akan menjadi 0 setelah
+        // di-cast, dan 0 bukan nilai fallback yang masuk akal (timeout 0
+        // berarti tanpa batas waktu).
+        $raw = $setting->rawValue();
+
+        if ($raw === null || trim($raw) === '') {
+            return $fallback;
+        }
+
+        return Setting::castValue($setting);
+    }
+
+    protected function engineUrl(string $settingKey, string $configPath): string
+    {
+        return rtrim((string) $this->engineSetting($settingKey, config($configPath, '')), '/');
     }
 
     /**
@@ -226,12 +318,33 @@ class RoutingService
     protected function routeWithOsrm(array $origin, array $destination, array $options, string $key): array
     {
         $engine = config("routing.engines.{$key}", []);
-        $profile = $this->profile($key === 'osrm_local' ? 'osrm' : 'osrm', $options['vehicle']);
+        $profile = $this->profile('osrm', $options['vehicle']);
 
-        // Pilih URL: untuk OSRM lokal gunakan server per-profil (car/bike beda port).
-        $baseUrl = $engine['url'] ?? '';
         if ($key === 'osrm_local') {
-            $baseUrl = config("routing.osrm_servers.{$profile}", $engine['url'] ?? null);
+            // Server lokal memakai port per-profil (car/bike/walk terpisah),
+            // URL-nya dikelola lewat setting supaya admin bisa mengganti port
+            // tanpa menyentuh .env.
+            $settingPerProfile = [
+                'driving' => 'osrm_car_url',
+                'cycling' => 'osrm_bike_url',
+                'walking' => 'osrm_walk_url',
+            ];
+
+            $baseUrl = $this->engineSetting(
+                $settingPerProfile[$profile] ?? 'osrm_car_url',
+                config("routing.osrm_servers.{$profile}")
+            );
+
+            $timeout = (int) $this->engineSetting('osrm_local_timeout', $engine['timeout'] ?? 5);
+        } else {
+            $baseUrl = $this->engineSetting('osrm_public_url', $engine['url'] ?? '');
+            $timeout = (int) $this->engineSetting('osrm_public_timeout', $engine['timeout'] ?? 15);
+        }
+
+        $baseUrl = rtrim((string) $baseUrl, '/');
+
+        if ($baseUrl === '') {
+            return $this->error("URL OSRM ({$key}) belum diatur.");
         }
 
         $coords = "{$origin[1]},{$origin[0]};{$destination[1]},{$destination[0]}";
@@ -253,12 +366,12 @@ class RoutingService
 
         $url = "{$baseUrl}/route/v1/{$profile}/{$coords}";
 
-        $response = Http::timeout($engine['timeout'] ?? 15)
+        $response = Http::timeout($timeout)
             ->withOptions(['verify' => false])
             ->get($url, $query);
 
         if (! $response->successful()) {
-            return $this->error("OSRM ({$key}) HTTP {$response->status()}.");
+            return $this->error("OSRM ({$key}) HTTP {$response->status()} dari {$baseUrl}.");
         }
 
         $data = $response->json();
@@ -340,10 +453,19 @@ class RoutingService
     protected function routeViaGraphhopper(array $origin, array $destination, array $options): array
     {
         $engine = config('routing.engines.graphhopper', []);
-        $apiKey = $engine['api_key'] ?? null;
 
-        if (! $apiKey) {
-            return $this->error('GRAPHHOPPER_API_KEY belum diatur.');
+        // Key dari database dulu, baru .env (lihat Setting::credential()).
+        $apiKey = Setting::credentialValue('graphhopper_api_key');
+
+        if ($apiKey === '') {
+            return $this->error('API key GraphHopper belum diatur.');
+        }
+
+        $baseUrl = $this->engineUrl('graphhopper_url', 'routing.engines.graphhopper.url');
+        $timeout = (int) $this->engineSetting('graphhopper_timeout', $engine['timeout'] ?? 30);
+
+        if ($baseUrl === '') {
+            return $this->error('URL GraphHopper belum diatur.');
         }
 
         $profile = $this->profile('graphhopper', $options['vehicle']);
@@ -367,7 +489,7 @@ class RoutingService
         }
 
         // GraphHopper live traffic (premium). Jika aktif dan tersedia.
-        $trafficSpeed = $engine['traffic_speed'] ?? null;
+        $trafficSpeed = $this->engineSetting('graphhopper_traffic_speed', $engine['traffic_speed'] ?? null);
         if (! empty($options['avoid_traffic']) && ! empty($trafficSpeed)) {
             $params['traffic_speed'] = $trafficSpeed;
         }
@@ -381,16 +503,16 @@ class RoutingService
                 . '&details=' . urlencode('toll')
                 . '&details=' . urlencode('max_height');
 
-        $url = "{$engine['url']}/route?{$query}";
+        $url = "{$baseUrl}/route?{$query}";
 
-        $response = Http::timeout($engine['timeout'] ?? 30)
+        $response = Http::timeout($timeout)
             ->withOptions(['verify' => false])
             ->get($url);
 
         if (! $response->successful()) {
             $body = $response->body();
             Log::warning("[Routing] GraphHopper HTTP {$response->status()}: {$body}");
-            return $this->error("GraphHopper HTTP {$response->status()}.");
+            return $this->error("GraphHopper HTTP {$response->status()} dari {$baseUrl}.");
         }
 
         $data = $response->json();
@@ -435,7 +557,10 @@ class RoutingService
     protected function routeViaTomtom(array $origin, array $destination, array $options): array
     {
         $engine = config('routing.engines.tomtom', []);
-        $apiKey = $engine['api_key'] ?? config('services.tomtom.key') ?? '';
+
+        // Credential yang sama dipakai Routing dan Traffic, jadi lewat satu
+        // pintu: database dulu, lalu .env.
+        $apiKey = Setting::credentialValue('tomtom_api_key');
 
         if (empty($apiKey)) {
             return $this->error('TomTom API key kosong.');

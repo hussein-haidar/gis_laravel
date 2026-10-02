@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Location;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ class GeoJsonController extends Controller
     {
         $compact = $request->query('compact') === '1';
 
-        $locations = Location::with('category')
+        $locations = Location::with(['category', 'wilayah.category'])
             ->whereHas('category', function ($q) {
                 $q->where('is_active', true);
             })
@@ -28,7 +29,9 @@ class GeoJsonController extends Controller
             ->get();
 
         $features = $locations->map(function (Location $location) use ($compact) {
-            $properties = $compact ? [
+            $isPlaceType = in_array($location->category?->name, Category::PLACE_TYPES, true);
+
+            $propertiesBase = [
                 'id' => $location->id,
                 'name' => $location->name,
                 'description' => $location->description,
@@ -37,17 +40,14 @@ class GeoJsonController extends Controller
                 'photo_url' => $location->photo_url,
                 'latitude' => (float) $location->latitude,
                 'longitude' => (float) $location->longitude,
-            ] : [
-                'id' => $location->id,
-                'name' => $location->name,
-                'description' => $location->description,
-                'category' => $location->category?->name,
-                'category_color' => $location->category?->color,
-                'photo_url' => $location->photo_url,
-                'latitude' => (float) $location->latitude,
-                'longitude' => (float) $location->longitude,
-                'created_at' => $location->created_at->toIso8601String(),
+                'is_wilayah' => !$isPlaceType,
+                'wilayah' => $location->wilayah?->name,
+                'provinsi' => $location->wilayah?->category?->name,
             ];
+
+            $properties = $compact
+                ? $propertiesBase
+                : $propertiesBase + ['created_at' => $location->created_at->toIso8601String()];
 
             // Compact (untuk marker peta): cukup titik, tanpa geometry raksasa
             // (polygon/linestring) yang membuat payload besar.
@@ -81,7 +81,7 @@ class GeoJsonController extends Controller
 
     public function show(Location $location): JsonResponse
     {
-        $location->load('category');
+        $location->load(['category', 'wilayah.category']);
 
         $geometry = $location->geometry;
         if (!$geometry) {
@@ -93,6 +93,8 @@ class GeoJsonController extends Controller
                 ],
             ];
         }
+
+        $isPlaceType = in_array($location->category?->name, Category::PLACE_TYPES, true);
 
         return response()->json([
             'type' => 'Feature',
@@ -107,6 +109,9 @@ class GeoJsonController extends Controller
                 'photo_url' => $location->photo_url,
                 'latitude' => (float) $location->latitude,
                 'longitude' => (float) $location->longitude,
+                'is_wilayah' => !$isPlaceType,
+                'wilayah' => $location->wilayah?->name,
+                'provinsi' => $location->wilayah?->category?->name,
                 'created_at' => $location->created_at->toIso8601String(),
             ],
         ]);

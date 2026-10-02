@@ -20,9 +20,19 @@ class TomTomTrafficService
 
     protected function refreshConfig(): void
     {
-        $this->key = (string) Setting::getValue('tomtom_api_key', '');
+        // Key: database dulu, lalu .env (Setting::credential()).
+        $this->key = Setting::credentialValue('tomtom_api_key');
         $this->baseUrl = rtrim((string) Setting::getValue('tomtom_traffic_url', 'https://api.tomtom.com/traffic/services/4'), '/');
         $this->timeout = (int) Setting::getValue('tomtom_timeout', 15);
+    }
+
+    /**
+     * Asal credential aktif, untuk ditampilkan di panel status. Nilai
+     * rahasianya sendiri tidak pernah ikut dikembalikan.
+     */
+    public function keySource(): string
+    {
+        return Setting::credentialSource('tomtom_api_key');
     }
 
     public function enabled(): bool

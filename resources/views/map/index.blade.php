@@ -73,6 +73,15 @@
             width: 18px; height: 7px; border-radius: 3px;
             display: inline-block; margin-right: 6px; vertical-align: middle;
         }
+        .map-legend .wilayah-sample {
+            width: 12px; height: 12px; border-radius: 2px;
+            background: #3b82f6; border: 1px solid #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            display: inline-block; margin-right: 6px; vertical-align: middle;
+        }
+        .wilayah-marker {
+            background: transparent; border: none;
+        }
         .routing-panel {
             position: absolute; top: 10px; right: 60px; z-index: 1000;
             background: #fff; padding: 12px; border-radius: 8px;
@@ -245,7 +254,6 @@
         // hosting free). Dimuat lewat API /api/geojson secara async — peta
         // langsung tampil, marker menyusul saat data siap.
         let allLocations = [];
-        const PLACE_TYPES = {!! json_encode($categories->pluck('name')) !!};
         const GEOJSON_URL = '{{ url('api/geojson') }}?compact=1' + (location.search ? location.search.replace(/^\?/, '&') : '');
 
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -376,12 +384,13 @@
         });
         const allMarkers = [];
         const heatData = [];
+        const wilayahLayer = L.layerGroup();
         let heatLayer = null;
         let heatActive = false;
 
         // Data dari GET /api/geojson berupa FeatureCollection:
         // { type:'FeatureCollection', features: [ { properties: { id,name,description,
-        //   category,category_color,photo_url }, geometry: { coordinates:[lng,lat] } } ] }
+        //   category,category_color,photo_url,is_wilayah,wilayah,provinsi }, geometry: { coordinates:[lng,lat] } } ] }
         function renderLocations(fc) {
             allLocations = (fc && fc.features) ? fc.features : [];
 
@@ -389,6 +398,20 @@
                 const p = feat.properties || {};
                 const lat = parseFloat(p.latitude);
                 const lng = parseFloat(p.longitude);
+
+                // Koordinat titik tempat/wilayah selalu ada di properties
+                // (fitur compact API memakai Point dari latitude/longitude).
+                if (p.is_wilayah) {
+                    const wilIcon = L.divIcon({
+                        className: 'wilayah-marker',
+                        html: `<div style="width:12px;height:12px;background:#3b82f6;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);border-radius:2px;"></div>`,
+                        iconSize: [12, 12], iconAnchor: [6, 6],
+                    });
+                    const w = L.marker([lat, lng], { icon: wilIcon });
+                    w.bindPopup(`<strong>${wilayahLabel(p)}</strong><br><span class="text-muted small">🏘 Wilayah (kabupaten/kota) · ${p.category || ''}</span>`);
+                    wilayahLayer.addLayer(w);
+                    return;
+                }
 
                 const color = p.category_color || '#9ca3af';
                 const icon = L.divIcon({
@@ -407,9 +430,12 @@
                 const photo = `<img src="${p.photo_url || placeholderUrl}" onerror="this.onerror=null;this.src='${placeholderUrl}'" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
                 const category = p.category
                     ? `<span style="color:${color};font-weight:600">● ${p.category}</span><br>` : '';
+                const wilayahBadge = (p.wilayah && p.provinsi)
+                    ? `<span style="display:inline-block;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;border-radius:999px;padding:1px 10px;font-size:12px;margin-top:4px">🏘 ${wilayahLabel(p)}, ${titleWords(p.provinsi)}</span><br>` : '';
 
                 marker.bindPopup(
                     `${photo}<strong>${p.name}</strong><br>` + category +
+                    wilayahBadge +
                     (p.description ? p.description + '<br>' : '') +
                     `${lat}, ${lng}<br>` +
                     `<a href="${'{{ route('map.show', ':id') }}'.replace(':id', p.id)}" class="small">{{ __('messages.view_detail') }} →</a>`
@@ -421,6 +447,19 @@
             });
 
             buildLegend();
+        }
+
+        // Format label badge wilayah: "Kab. Aceh Barat Daya, Sumatera Barat"
+        // atau "Kota Banda Aceh, Aceh" / "Prov. Aceh" bila cuma poligon provinsi.
+        function titleWords(s) {
+            return String(s || '').toLowerCase().replace(/(^|\s)\w/g, function (m) { return m.toUpperCase(); });
+        }
+        function wilayahLabel(p) {
+            const w = p.wilayah, prov = p.provinsi;
+            if (!w) return '';
+            if (w === prov) return 'Prov. ' + titleWords(w);
+            if (/^KOTA\s/.test(w)) return 'Kota ' + titleWords(w.replace(/^KOTA\s/, ''));
+            return 'Kab. ' + titleWords(w);
         }
 
         const overlays = {};
@@ -636,6 +675,10 @@
         overlays['📍 Semua Lokasi'] = locationsLayer;
         map.addLayer(locationsLayer);
 
+        // Layer wilayah (kabupaten/kota) TIDAK ditambahkan secara default agar
+        // peta utama hanya menampilkan titik tempat. Tersedia via kontrol layer.
+        overlays['🏘 Wilayah'] = wilayahLayer;
+
         overlays['🚦 Kemacetan'] = congestionLayer;
         map.addLayer(congestionLayer);
 
@@ -657,12 +700,12 @@
             const legendRows = [];
             allLocations.forEach(function (feat) {
                 const p = feat.properties || {};
+                if (p.is_wilayah) return; // wilayah tampil sebagai layer terpisah
                 if (!p.category_color) return;
                 const c = p.category_color;
                 if (legendColors.indexOf(c) !== -1) return;
                 legendColors.push(c);
-                const isPlaceType = PLACE_TYPES.indexOf(p.category) !== -1;
-                legendRows.push(`<i style="background:${c}"></i> ${isPlaceType ? p.category : 'Wilayah (kabupaten/kota)'}`);
+                legendRows.push(`<i style="background:${c}"></i> ${p.category || ''}`);
             });
 
             const legend = L.control({ position: 'bottomleft' });
@@ -671,6 +714,8 @@
                 div.innerHTML = '<strong>Lokasi</strong><br>'
                     + '<span class="cluster-sample"></span> Cluster (warna = kategori dominan, angka = jumlah lokasi, klik untuk zoom)<br>'
                     + legendRows.join('<br>')
+                    + '<br><strong>Wilayah</strong><br>'
+                    + '<i class="wilayah-sample"></i> Wilayah (kabupaten/kota, aktifkan dari kontrol layer)<br>'
                     + '<br><strong>Kemacetan</strong><br>'
                     + congestionLegend.map(function (x) {
                         return '<i class="road" style="background:' + x[0] + '"></i> ' + x[1];
@@ -822,6 +867,7 @@
             const local = (allLocations || [])
                 .filter(function (feat) {
                     const p = feat.properties || {};
+                    if (p.is_wilayah) return false;
                     return p.name && p.name.toLowerCase().indexOf(ql) !== -1;
                 })
                 .slice(0, 8)

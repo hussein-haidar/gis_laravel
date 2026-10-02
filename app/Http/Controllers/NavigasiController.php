@@ -34,9 +34,14 @@ class NavigasiController extends Controller
         return response()->json(
             Location::query()
                 ->with('category')
+                ->whereHas('category', function ($query) {
+                    $query->whereIn('name', Category::PLACE_TYPES);
+                })
                 ->when($q !== '', function ($query) use ($q) {
-                    $query->where('name', 'like', "%{$q}%")
-                        ->orWhere('description', 'like', "%{$q}%");
+                    $query->where(function ($sub) use ($q) {
+                        $sub->where('name', 'like', "%{$q}%")
+                            ->orWhere('description', 'like', "%{$q}%");
+                    });
                 })
                 ->orderBy('name')
                 ->limit(20)

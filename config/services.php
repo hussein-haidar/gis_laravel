@@ -47,4 +47,26 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'openverse' => [
+        // Token manual (opsional). Kalau diisi, dipakai langsung dan tidak pernah refresh.
+        // Kalau kosong, token diambil otomatis dari client_credentials lalu di-cache.
+        'token' => env('OPENVERSE_ACCESS_TOKEN'),
+        'client_id' => env('OPENVERSE_CLIENT_ID'),
+        'client_secret' => env('OPENVERSE_CLIENT_SECRET'),
+        'user_agent' => env('OPENVERSE_USER_AGENT'),
+        'auto_fetch_after_sync' => env('OPENVERSE_AUTO_FETCH_AFTER_SYNC', true),
+        'auto_fetch_limit' => (int) env('OPENVERSE_AUTO_FETCH_LIMIT', 50),
+        'auto_fetch_sleep_ms' => (int) env('OPENVERSE_AUTO_FETCH_SLEEP_MS', 1000),
+        'queue_fetch' => env('OPENVERSE_QUEUE_FETCH', true),
+    ],
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+        'model' => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
+        'fast_model' => env('GROQ_FAST_MODEL', 'qwen/qwen3.8-27b'),
+        'timeout' => (int) env('GROQ_TIMEOUT', 45),
+        'max_tokens' => (int) env('GROQ_MAX_TOKENS', 900),
+    ],
+
 ];

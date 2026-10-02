@@ -704,6 +704,15 @@ public function store(Request $request)
                 $message .= ", {$stats['errors']} error";
             }
 
+            $photoStats = $syncService->lastPhotoFetchStats();
+            if ($photoStats && $photoStats['remaining'] > 0) {
+                if ($photoStats['queued']) {
+                    $message .= ". Pengisian {$photoStats['remaining']} foto dijadwalkan di background";
+                } else {
+                    $message .= ". Foto: {$photoStats['success']} diisi otomatis, {$photoStats['remaining']} menunggu";
+                }
+            }
+
             return redirect()
                 ->route('admin.locations.index')
                 ->with($stats['errors'] > 0 ? 'warning' : 'success', $message);

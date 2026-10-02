@@ -19,7 +19,8 @@ class MapController extends Controller
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->whereHas('category', function ($q) {
-                $q->where('is_active', true);
+                $q->where('is_active', true)
+                    ->whereIn('name', Category::PLACE_TYPES);
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
@@ -42,10 +43,18 @@ class MapController extends Controller
     {
         $locations = Location::whereKeyNot($location->getKey())
             ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->whereHas('category', function ($q) {
+                $q->where('is_active', true)
+                    ->whereIn('name', Category::PLACE_TYPES);
+            })
             ->orderBy('name')->get();
 
         $nearest = Location::with('category')
             ->whereKeyNot($location->getKey())
+            ->whereHas('category', function ($q) {
+                $q->where('is_active', true)
+                    ->whereIn('name', Category::PLACE_TYPES);
+            })
             ->get()
             ->map(function (Location $other) use ($location) {
                 return [
@@ -61,6 +70,8 @@ class MapController extends Controller
         $ratingCount = $reviews->count();
         $userReview = auth()->check() ? $location->reviews()->where('user_id', auth()->id())->first() : null;
         $isFavorite = auth()->check() ? $location->favorites()->where('user_id', auth()->id())->exists() : false;
+
+        $location->load('wilayah.category');
 
         return view('map.show', compact('location', 'nearest', 'locations', 'reviews', 'avgRating', 'ratingCount', 'userReview', 'isFavorite'));
     }

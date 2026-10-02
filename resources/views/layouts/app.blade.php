@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-control-geocoder/dist/Control.Geocoder.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure/dist/leaflet-measure.css">
+<link rel="stylesheet" href="{{ asset('css/chat-widget.css') }}">
 
     @stack('styles')
     @yield('styles')
@@ -328,6 +329,8 @@
         })();
         @endauth
     </script>
+
+    @include('partials.chat-widget')
 
     @stack('scripts')
 @yield('scripts')

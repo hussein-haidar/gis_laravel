@@ -14,6 +14,7 @@ class Location extends Model
         'latitude',
         'longitude',
         'category_id',
+        'wilayah_id',
         'photo',
         'geometry',
     ];
@@ -27,6 +28,11 @@ class Location extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function wilayah(): BelongsTo
+    {
+        return $this->belongsTo(Location::class, 'wilayah_id');
     }
 
     public function photos(): HasMany

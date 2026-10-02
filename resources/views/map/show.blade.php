@@ -38,32 +38,31 @@
         }
         .map-fallback.active { display: flex; }
         .vehicle-btn {
-            width: 46px;
-            height: 46px;
+            width: 48px;
+            height: 48px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
+            border-radius: 12px;
             border: 2px solid #e5e7eb;
             background: #fff;
+            font-size: 1.45rem;
+            line-height: 1;
             cursor: pointer;
             transition: all 0.15s ease;
+            user-select: none;
         }
         .vehicle-btn:hover {
             border-color: #93c5fd;
             background: #eff6ff;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(59,130,246,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(59,130,246,0.18);
         }
         .vehicle-btn.active {
             border-color: #f59e0b;
             background: #fef3c7;
             box-shadow: 0 0 0 3px rgba(245,158,11,0.35);
-            transform: scale(1.05);
-        }
-        .vehicle-btn svg {
-            width: 22px;
-            height: 22px;
+            transform: scale(1.06);
         }
         .detail-photo {
             width: 100%; max-height: 320px;
@@ -320,6 +319,23 @@
                         <span class="badge text-white mb-3 px-3 py-2" style="background:{{ $location->category->color }}; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">{{ $location->category->name }}</span>
                     @endif
 
+                    @if ($location->wilayah)
+                    @php
+                        $wilayahName = $location->wilayah->name;
+                        $isKota = str_starts_with($wilayahName, 'KOTA ');
+                        $isProvinsi = $wilayahName === $location->wilayah->category->name;
+                        $wilayahLabel = $isProvinsi
+                            ? 'Prov. ' . preg_replace_callback('/(^|\s)\w/', fn ($m) => strtoupper($m[0]), mb_strtolower($wilayahName))
+                            : ($isKota
+                                ? 'Kota ' . preg_replace_callback('/(^|\s)\w/', fn ($m) => strtoupper($m[0]), mb_strtolower(trim(substr($wilayahName, 5))))
+                                : 'Kab. ' . preg_replace_callback('/(^|\s)\w/', fn ($m) => strtoupper($m[0]), mb_strtolower($wilayahName)));
+                        $provinsiLabel = preg_replace_callback('/(^|\s)\w/', fn ($m) => strtoupper($m[0]), mb_strtolower($location->wilayah->category->name));
+                    @endphp
+                        <span class="badge d-inline-block mb-3 ms-1 px-3 py-2" style="background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;text-transform:none;">
+                            🏘 {{ $wilayahLabel }}, {{ $provinsiLabel }}
+                        </span>
+                    @endif
+
                     @if ($location->description)
                         <p class="mb-4 text-muted">{{ $location->description }}</p>
                     @endif
@@ -401,24 +417,12 @@
                     <div class="mb-3">
                         <div class="info-label mb-1">{{ __('messages.vehicle_type') }}</div>
                         <div class="vehicle-picker d-flex flex-wrap gap-2 justify-content-center" id="vehicle-picker">
-                            <button type="button" class="vehicle-btn active" data-vehicle="mobil" title="Mobil">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.6-.4-1-1-1h-23c-.6 0-1 .4-1 1v3c0 .6.4 1 1 1h2"/><circle cx="8" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg>
-                            </button>
-                            <button type="button" class="vehicle-btn" data-vehicle="motor" title="Motor">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M14 17h-3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3"/></svg>
-                            </button>
-                            <button type="button" class="vehicle-btn" data-vehicle="sepeda" title="Sepeda">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="17" r="2"/><circle cx="6" cy="17" r="2"/><path d="M6 17V5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v12"/><line x1="6" y1="17" x2="6" y2="5"/><line x1="18" y1="17" x2="18" y2="5"/></svg>
-                            </button>
-                            <button type="button" class="vehicle-btn" data-vehicle="bis" title="Bis">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><line x1="8" y1="5" x2="8" y2="19"/></svg>
-                            </button>
-                            <button type="button" class="vehicle-btn" data-vehicle="truk_sedang" title="Truk Sedang">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="8" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>
-                            </button>
-                            <button type="button" class="vehicle-btn" data-vehicle="truk_besar" title="Truk Besar">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><rect x="10" y="5" width="4" height="6"/></svg>
-                            </button>
+                            <button type="button" class="vehicle-btn active" data-vehicle="mobil" data-icon="🚗" title="Mobil">🚗</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="motor" data-icon="🏍️" title="Motor">🏍️</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="sepeda" data-icon="🚲" title="Sepeda">🚲</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="bis" data-icon="🚌" title="Bis">🚌</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="truk_sedang" data-icon="🚚" title="Truk Sedang">🚚</button>
+                            <button type="button" class="vehicle-btn" data-vehicle="truk_besar" data-icon="🚛" title="Truk Besar">🚛</button>
                         </div>
                         <div class="text-muted small mt-1" id="vehicle-label">Mobil</div>
                     </div>
@@ -477,104 +481,100 @@
         </div>
     @endif
 
-    {{-- Ulasan & Rating (full-width, di bawah Lokasi Terdekat) --}}
+    {{-- Ulasan & Rating (Satu Card Terpadu) --}}
     <div class="mt-4 pt-4 border-top review-section">
-        <h2 class="h5 mb-3">{{ __('messages.reviews_title') }}</h2>
-
-        <div class="card mb-4 shadow-sm border-0">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-center flex-wrap gap-4 py-2">
-                    <div class="text-center">
-                        <div class="fs-1 fw-bold text-warning lh-1">{{ number_format((float) $avgRating, 1, ',', '.') }}</div>
-                        <div class="text-warning" aria-label="Rating {{ round($avgRating) }} dari 5">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h2 class="h5 m-0 fw-bold">{{ __('messages.reviews_title') }}</h2>
+                <span class="badge bg-secondary">{{ $reviews->count() }}</span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4 align-items-center mb-4 pb-4 border-bottom">
+                    <div class="col-md-5 text-center border-end">
+                        <div class="fs-1 fw-bold text-warning lh-1 mb-2">{{ number_format((float) $avgRating, 1, ',', '.') }}</div>
+                        <div class="text-warning fs-5 mb-2" aria-label="Rating {{ round($avgRating) }} dari 5">
                             @for ($i = 1; $i <= 5; $i++)
                                 <span>{{ $i <= round($avgRating) ? '★' : '☆' }}</span>
                             @endfor
                         </div>
-                    </div>
-                    <div class="text-muted text-center">
                         <div class="fw-semibold text-dark">{{ __('messages.review_count', ['count' => $ratingCount]) }}</div>
-                        <div class="small">{{ $ratingCount > 0 ? __('messages.review_avg_from_visitors') : __('messages.no_reviews_yet') }}</div>
+                        <div class="small text-muted">{{ $ratingCount > 0 ? __('messages.review_avg_from_visitors') : __('messages.no_reviews_yet') }}</div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        @auth
-            <div class="card mb-4 shadow-sm border-0">
-                <div class="card-header fw-semibold">{{ $userReview ? __('messages.update_review') : __('messages.write_review') }}</div>
-                <div class="card-body">
-                    @if ($userReview && $userReview->status === 'pending')
-                        <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
-                    @endif
-                    <form action="{{ route('reviews.store', $location) }}" method="POST">
-                        @csrf
-                        <div class="mb-2">
-                            <label class="form-label small fw-semibold">Rating Anda</label>
-                            <div class="star-input d-flex" data-stars="5">
-                                @for ($i = 1; $i <= 5; $i++)
-                                    <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
-                                            data-value="{{ $i }}" style="color:#d1d5db;">★</button>
-                                @endfor
-                                <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
-                            </div>
-                            @error('rating')
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="mb-2">
-                            <input type="text" name="title" class="form-control form-control-sm"
-                                   placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
-                        </div>
-                        <div class="mb-2">
-                            <textarea name="comment" rows="3" class="form-control form-control-sm"
-                                      placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">
-                            {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
-                        </button>
-                    </form>
-                </div>
-            </div>
-        @else
-            <div class="card mb-4 text-center shadow-sm border-0">
-                <div class="card-body py-4">
-                    <p class="text-muted mb-3">{{ __('messages.login_to_review') }}</p>
-                    <a href="{{ route('login') }}" class="btn btn-primary btn-lg">{{ __('messages.nav_login') }}</a>
-                </div>
-            </div>
-        @endauth
-
-        <div class="card shadow-sm border-0">
-            <div class="card-header fw-semibold">{{ __('messages.user_reviews') }} <span class="badge bg-secondary">{{ $reviews->count() }}</span></div>
-            <div class="card-body">
-                @if ($reviews->isEmpty())
-                    <p class="text-muted small mb-3">{{ __('messages.no_reviews') }}</p>
-                @else
-                    <div class="mb-4">
-                        @foreach ($reviews as $review)
-                            <div class="border-bottom py-2">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <span class="text-warning small">
+                    <div class="col-md-7">
+                        @auth
+                            <div class="p-3 bg-light rounded-3 border">
+                                <h3 class="h6 fw-semibold mb-3">{{ $userReview ? __('messages.update_review') : __('messages.write_review') }}</h3>
+                                @if ($userReview && $userReview->status === 'pending')
+                                    <div class="alert alert-info py-2 small mb-3">{{ __('messages.review_pending_moderation') }}</div>
+                                @endif
+                                <form action="{{ route('reviews.store', $location) }}" method="POST">
+                                    @csrf
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold">Rating Anda</label>
+                                        <div class="star-input d-flex" data-stars="5">
                                             @for ($i = 1; $i <= 5; $i++)
-                                                {{ $i <= $review->rating ? '★' : '☆' }}
+                                                <button type="button" class="star-btn border-0 bg-transparent fs-3 lh-1 px-1"
+                                                        data-value="{{ $i }}" style="color:#d1d5db;">★</button>
                                             @endfor
-                                        </span>
-                                        <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
+                                            <input type="hidden" name="rating" value="{{ $userReview->rating ?? 5 }}" required>
+                                        </div>
+                                        @error('rating')
+                                            <div class="text-danger small">{{ $message }}</div>
+                                        @enderror
                                     </div>
-                                    <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
-                                </div>
-                                @if ($review->title)
-                                    <div class="fw-semibold mt-1">{{ $review->title }}</div>
-                                @endif
-                                @if ($review->comment)
-                                    <div class="small text-muted mt-1">{{ $review->comment }}</div>
-                                @endif
+                                    <div class="mb-2">
+                                        <input type="text" name="title" class="form-control form-control-sm"
+                                               placeholder="{{ __('messages.review_title_placeholder') }}" value="{{ old('title', $userReview->title ?? '') }}">
+                                    </div>
+                                    <div class="mb-2">
+                                        <textarea name="comment" rows="3" class="form-control form-control-sm"
+                                                  placeholder="{{ __('messages.review_comment_placeholder') }}">{{ old('comment', $userReview->comment ?? '') }}</textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        {{ $userReview ? __('messages.update_review') : __('messages.submit_review') }}
+                                    </button>
+                                </form>
                             </div>
-                        @endforeach
+                        @else
+                            <div class="text-center py-4 px-3 bg-light rounded-3 border">
+                                <p class="text-muted mb-3">{{ __('messages.login_to_review') }}</p>
+                                <a href="{{ route('login') }}" class="btn btn-primary px-4">{{ __('messages.nav_login') }}</a>
+                            </div>
+                        @endauth
                     </div>
-                @endif
+                </div>
+
+                <div>
+                    <h3 class="h6 fw-semibold mb-3">{{ __('messages.user_reviews') }}</h3>
+                    @if ($reviews->isEmpty())
+                        <p class="text-muted small mb-0">{{ __('messages.no_reviews') }}</p>
+                    @else
+                        <div>
+                            @foreach ($reviews as $review)
+                                <div class="border-bottom py-2">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <span class="text-warning small">
+                                                @for ($i = 1; $i <= 5; $i++)
+                                                    {{ $i <= $review->rating ? '★' : '☆' }}
+                                                @endfor
+                                            </span>
+                                            <span class="fw-semibold ms-1">{{ $review->user?->name ?? 'Pengguna' }}</span>
+                                        </div>
+                                        <span class="text-muted small">{{ $review->created_at->format('d M Y') }}</span>
+                                    </div>
+                                    @if ($review->title)
+                                        <div class="fw-semibold mt-1">{{ $review->title }}</div>
+                                    @endif
+                                    @if ($review->comment)
+                                        <div class="small text-muted mt-1">{{ $review->comment }}</div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             </div>
         </div>
     </div>
@@ -814,6 +814,19 @@
                 .addTo(congestionLayer);
         }
 
+        function placeFallbackCongestion(baseLat, baseLng) {
+            const points = [
+                [baseLat + 0.008, baseLng + 0.012, 'severe', 'Jl. Utama (Pusat)'],
+                [baseLat - 0.010, baseLng + 0.006, 'moderate', 'Simpang Pasar'],
+                [baseLat + 0.004, baseLng - 0.011, 'moderate', 'Jl. Lintas Kabupaten'],
+                [baseLat - 0.007, baseLng - 0.008, 'light', 'Jalur Lingkar Luar'],
+            ];
+            points.forEach(function (p) {
+                drawCongestionAt(baseLat, baseLng, [p[0], p[1]], p[2], p[3]);
+            });
+            renderCongestionList();
+        }
+
         function loadSimulatedCongestion(centerLat, centerLng) {
             congestionLayer.clearLayers();
             congestionItems = [];
@@ -827,9 +840,7 @@
             if (sub) sub.textContent = 'Mencari jalan terdekat dari data OSM...';
 
             // Ambil daftar JALAN asli (ber-Nama) dari OSM (Overpass) di bounding box
-            // kecil. Titik kemacetan SELALU digambar di atas jalan/darat — tidak ada
-            // titik palsu di laut. Kalau area laut terbuka tanpa jalan (mis. Raja
-            // Ampat), hasilnya kosong. Nama jalan dipakai juga untuk daftar.
+            // kecil. Jika Overpass offline/timeout, otomatis pakai simulasi cadangan.
             const d = 0.015; // ~1.5 km ke tiap arah (bbox Overpass = south,west,north,east)
             const bbox = (centerLat - d) + ',' + (centerLng - d) + ',' + (centerLat + d) + ',' + (centerLng + d);
             const query =
@@ -845,8 +856,8 @@
             // Coba endpoint Overpass berurutan sampai ada yang berhasil.
             function tryEndpoint(i) {
                 if (i >= endpoints.length) {
-                    renderCongestionList();
-                    if (badge) badge.textContent = 'ℹ️ Tidak ada data kemacetan di area ini.';
+                    placeFallbackCongestion(centerLat, centerLng);
+                    if (badge) badge.textContent = '⚠️ Kemacetan: Simulasi Cadangan';
                     return;
                 }
                 fetchWithTimeout(endpoints[i] + '?data=' + encodeURIComponent(query), 8000)
@@ -859,8 +870,8 @@
                             return e.type === 'way' && e.center;
                         });
                         if (!ways.length) {
-                            renderCongestionList();
-                            if (badge) badge.textContent = 'ℹ️ Tidak ada data kemacetan di area ini (di luar cakupan / laut).';
+                            placeFallbackCongestion(centerLat, centerLng);
+                            if (badge) badge.textContent = '⚠️ Kemacetan: Simulasi Cadangan';
                             return;
                         }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\GeoJsonController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\NavigasiController;
@@ -50,6 +51,9 @@ Route::middleware('guest')->group(function () {
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 Route::get('language/{locale}', [\App\Http\Controllers\LanguageController::class, 'switch'])->name('language.switch');
+
+// ── Chatbot asisten perjalanan ───────────────────────────────────────────────
+Route::post('chat', [ChatController::class, 'ask'])->name('chat.ask');
 
 // ── Riwayat Navigasi (untuk semua user login) ────────────────────────────────
 Route::middleware('auth')->prefix('riwayat')->name('history.')->group(function () {
@@ -123,5 +127,6 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
     Route::delete('reviews/{review}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroy'])->name('reviews.destroy');
 
     Route::get('pengaturan', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
+    Route::post('pengaturan/tes-key', [\App\Http\Controllers\Admin\SettingsController::class, 'testKey'])->name('settings.test-key');
     Route::put('pengaturan', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
 });

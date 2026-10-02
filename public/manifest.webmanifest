@@ -2,7 +2,7 @@
     "name": "GIS Peta Interaktif",
     "short_name": "GIS Peta",
     "description": "Aplikasi Sistem Informasi Geografis - Jelajahi lokasi, navigasi, dan kemacetan secara offline.",
-    "start_url": "/",
+    "start_url": "./",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#1e40af",
