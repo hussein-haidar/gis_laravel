@@ -4,6 +4,7 @@ namespace App\Services\Gis;
 
 use App\Models\Category;
 use App\Models\Location;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -17,9 +18,17 @@ class WikimediaPhotoFetcher
 
     protected const TOKEN_CACHE_TTL = 60 * 60 * 12;
 
-    public function __construct(?string $token = null)
-    {
+    /** Berapa banyak hasil yang diambil per query dari tiap sumber. */
+    protected const OPENVERSE_PAGE_SIZE = 20;
+
+    protected const COMMONS_PAGE_SIZE = 6;
+
+    public function __construct(
+        ?string $token = null,
+        protected ?PhotoQualityValidator $validator = null,
+    ) {
         $this->token = $token;
+        $this->validator ??= new PhotoQualityValidator;
     }
 
     /**
@@ -34,7 +43,7 @@ class WikimediaPhotoFetcher
         }
 
         $configured = config('services.openverse.token');
-        if (!empty($configured)) {
+        if (! empty($configured)) {
             return $this->token = $configured;
         }
 
@@ -63,12 +72,14 @@ class WikimediaPhotoFetcher
                     'client_secret' => $clientSecret,
                 ]);
         } catch (\Throwable $e) {
-            Log::error('Openverse token request failed: ' . $e->getMessage());
+            Log::error('Openverse token request failed: '.$e->getMessage());
+
             return null;
         }
 
-        if (!$resp->ok()) {
-            Log::error('Openverse token request HTTP ' . $resp->status());
+        if (! $resp->ok()) {
+            Log::error('Openverse token request HTTP '.$resp->status());
+
             return null;
         }
 
@@ -86,7 +97,7 @@ class WikimediaPhotoFetcher
      * Lokasi (kategori tempat) yang fotonya kosong: null, string kosong,
      * atau path yang menunjuk file yang sudah hilang di storage.
      */
-    public function locationsMissingPhoto(?\Illuminate\Support\Collection $locations = null): \Illuminate\Support\Collection
+    public function locationsMissingPhoto(?Collection $locations = null): Collection
     {
         $query = $locations
             ? $locations->filter(fn ($loc) => $loc instanceof Location)
@@ -101,7 +112,7 @@ class WikimediaPhotoFetcher
                     return true;
                 }
 
-                return !file_exists(storage_path('app/public/' . $photo));
+                return ! file_exists(storage_path('app/public/'.$photo));
             })
             ->sortBy('id')
             ->values();
@@ -110,46 +121,79 @@ class WikimediaPhotoFetcher
     /**
      * Coba isi satu lokasi dengan foto dari Openverse/Wikimedia Commons.
      * Mengembalikan path foto tersimpan, atau null bila gagal.
+     *
+     * Setiap kandidat divalidasi berdasarkan isinya (bukan sekadar "bisa
+     * dibaca") dan kandidat yang isinya sudah dipakai lokasi lain ditolak.
+     * Berkas yang ditolak tidak pernah ditulis ke storage, sehingga folder
+     * location_photos tidak lagi menumpuk file yatim.
      */
     public function fetchForLocation(Location $loc): ?string
     {
-        $urls = $this->searchPhoto($loc->name);
+        $candidates = $this->searchPhotos($loc->name);
 
-        if (empty($urls)) {
+        if ($candidates === []) {
             return null;
         }
 
-        foreach ($urls as $url) {
+        foreach ($candidates as $candidate) {
+            $url = $candidate['url'];
+
             try {
                 $resp = Http::withHeaders(['User-Agent' => $this->userAgent()])
                     ->timeout(25)
                     ->get($url);
             } catch (\Throwable $e) {
-                Log::error("Wikimedia download error for {$loc->name}: " . $e->getMessage());
+                Log::error("Wikimedia download error for {$loc->name}: ".$e->getMessage());
+
                 continue;
             }
 
-            if (!$resp->ok() || $resp->body() === '') {
+            if (! $resp->ok() || $resp->body() === '') {
                 continue;
             }
 
             $body = $resp->body();
-            if (!@getimagesizefromstring($body) && !str_ends_with(strtolower($url), '.svg')) {
+
+            if (! @getimagesizefromstring($body) && ! str_ends_with(strtolower($url), '.svg')) {
+                continue;
+            }
+
+            // Duplikat: isi yang sama sudah terpasang di lokasi lain. Tanpa
+            // cek ini dozens "Bandar Udara ..."-search berakhir memakai satu
+            // gambar generik yang sama persis.
+            if ($this->isAlreadyUsedElsewhere($loc, $body)) {
+                Log::info("Photo skipped (duplicate) for {$loc->name}: $url");
+
+                continue;
+            }
+
+            // Buang kanvas putih bertulis, bidang warna rata, dan gambar
+            // hitam/putih penuh sebelum berkas menyentuh disk.
+            if (! $this->validator->isUsable($body)) {
+                $this->validator->logRejected($loc->name, $this->validator->inspect($body));
+
                 continue;
             }
 
             $ext = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION)) ?: 'jpg';
-            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true)) {
+            if (! in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true)) {
                 $ext = 'jpg';
             }
 
-            $filename = "location_photos/{$loc->id}_" . md5($loc->name) . ".{$ext}";
+            $previous = $loc->photo;
+            $filename = "location_photos/{$loc->id}_".md5($loc->name).".{$ext}";
 
-            if (!Storage::disk('public')->put($filename, $body)) {
+            if (! Storage::disk('public')->put($filename, $body)) {
                 continue;
             }
 
             $loc->update(['photo' => $filename]);
+            $this->rememberOwnHash($loc, $body);
+
+            // Hapus versi lama supaya tidak tertinggal sebagai file yatim.
+            if ($previous && $previous !== $filename) {
+                Storage::disk('public')->delete($previous);
+            }
 
             return $filename;
         }
@@ -158,48 +202,159 @@ class WikimediaPhotoFetcher
     }
 
     /**
-     * Ambil daftar kandidat URL foto. Openverse dipakai lebih dulu karena
-     * hasilnya relevan, lalu Wikimedia Commons API sebagai cadangan karena
-     * index Openverse kadang basi (URL 404 padahal filenya masih ada).
+     * True bila isi berkas identik dengan foto yang sudah dipakai lokasi lain.
+     *
+     * Peta md5 -> lokasi dibangun lazily lalu disimpan di memori. Tanpa
+     * cache, setiap kandidat akan menghitung md5 untuk ribuan berkas dan
+     * proses fetch menjadi O(n^2).
+     *
+     * @var array<string, int>|null
      */
-    public function searchPhoto(string $query): array
-    {
-        $query = preg_replace('/\s+/', ' ', $query);
-        $candidates = [$query];
+    protected ?array $usedHashes = null;
 
-        // Fallback: buang kata terakhir bertahap ("Pantai Sembukan Indonesia" -> "Pantai Sembukan")
+    protected function isAlreadyUsedElsewhere(Location $loc, string $binary): bool
+    {
+        $hash = md5($binary);
+
+        if ($this->usedHashes === null) {
+            $this->usedHashes = [];
+
+            foreach (Location::query()
+                ->whereNotNull('photo')
+                ->get(['id', 'photo']) as $other) {
+                $path = storage_path('app/public/'.$other->photo);
+
+                if (is_file($path)) {
+                    $this->usedHashes[md5_file($path)] = $other->id;
+                }
+            }
+        }
+
+        if (! isset($this->usedHashes[$hash])) {
+            return false;
+        }
+
+        // Hash yang sama dengan lokasi sendiri bukan duplikat.
+        return $this->usedHashes[$hash] !== $loc->id;
+    }
+
+    /** Catat hash milik lokasi sendiri setelah foto terpasang. */
+    protected function rememberOwnHash(Location $loc, string $binary): void
+    {
+        if ($this->usedHashes !== null) {
+            $this->usedHashes[md5($binary)] = $loc->id;
+        }
+    }
+
+    /**
+     * Daftar kandidat URL foto, diurutkan dari yang paling relevan.
+     *
+     * Openverse dipakai lebih dulu karena hasilnya relevan, lalu Wikimedia
+     * Commons API sebagai cadangan karena index Openverse kadang basi
+     * (URL 404 padahal filenya masih ada).
+     *
+     * Setiap sumber mengembalikan beberapa kandidat, bukan hanya yang
+     * pertama: versi lama langsung memakai hasil pertama sehingga semua
+     * lokasi dengan nama mirip ("Bandar Udara ...") mendapat gambar generik
+     * yang sama. Kandidat diurutkan berdasarkan skor relevansi judul.
+     *
+     * @return array<int, array{url: string, title: string, source: string, score: int}>
+     */
+    public function searchPhotos(string $query): array
+    {
+        $query = preg_replace('/\s+/', ' ', trim($query));
+        $queries = [$query];
+
+        // Fallback: buang kata terakhir bertahap
+        // ("Pantai Sembukan Indonesia" -> "Pantai Sembukan").
         $words = array_values(array_filter(explode(' ', $query)));
         while (count($words) > 1) {
             array_pop($words);
-            $candidates[] = implode(' ', $words);
+            $queries[] = implode(' ', $words);
         }
 
-        $urls = [];
+        $scored = [];
 
-        foreach ($candidates as $q) {
-            $url = $this->openverseWikimediaUrl($q);
-            if ($url && !in_array($url, $urls, true)) {
-                $urls[] = $url;
+        foreach ($queries as $q) {
+            foreach ($this->openverseCandidates($q) as $c) {
+                $this->collectCandidate($scored, $c, $query);
             }
         }
 
-        foreach ($candidates as $q) {
-            $url = $this->commonsApiUrl($q);
-            if ($url && !in_array($url, $urls, true)) {
-                $urls[] = $url;
+        foreach ($queries as $q) {
+            foreach ($this->commonsCandidates($q) as $c) {
+                $this->collectCandidate($scored, $c, $query);
             }
         }
 
-        return $urls;
+        uasort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_values($scored);
     }
 
-    protected function openverseWikimediaUrl(string $query, bool $allowRetry = true): ?string
+    /**
+     * Backwards-compatible wrapper yang hanya mengembalikan URL.
+     *
+     * @return array<int, string>
+     */
+    public function searchPhoto(string $query): array
+    {
+        return array_column($this->searchPhotos($query), 'url');
+    }
+
+    /**
+     * @param  array<int, array{url: string, title: string, source: string, score: int}>  $scored
+     * @param  array{url: string, title: string, source: string}  $candidate
+     */
+    protected function collectCandidate(array &$scored, array $candidate, string $query): void
+    {
+        if (isset($scored[$candidate['url']])) {
+            return;
+        }
+
+        $candidate['score'] = $this->relevanceScore($candidate['title'], $query);
+        $scored[$candidate['url']] = $candidate;
+    }
+
+    /**
+     * Skor relevansi judul kandidat terhadap nama lokasi.
+     *
+     * Judul yang memuat seluruh kata kunci lokasi bernilai paling tinggi;
+     * kata umum seperti "Indonesia" tidak dihitung karena hampir semua judul
+     * memuatnya dan tidak membedakan lokasi.
+     */
+    protected function relevanceScore(string $title, string $query): int
+    {
+        $title = mb_strtolower($title);
+        $needles = array_filter(preg_split('/\s+/', mb_strtolower($query)) ?: []);
+
+        // Kata yang tidak spesifik: abaikan agar tidak menaikkan skor.
+        $stopWords = ['indonesia', 'indonesian', 'the', 'of', 'dan', 'di', 'ke', 'dari', 'at', 'in'];
+
+        $score = 0;
+        foreach ($needles as $needle) {
+            if (in_array($needle, $stopWords, true)) {
+                continue;
+            }
+            if (mb_strpos($title, $needle) !== false) {
+                $score++;
+            }
+        }
+
+        return $score;
+    }
+
+    /**
+     * Kandidat dari Openverse, dibatasi per query.
+     *
+     * @return array<int, array{url: string, title: string, source: string}>
+     */
+    protected function openverseCandidates(string $query, bool $allowRetry = true): array
     {
         $params = [
             'q' => $query,
-            'page_size' => 20,
+            'page_size' => self::OPENVERSE_PAGE_SIZE,
             'license_type' => 'all',
-            'aspect_ratio' => 'wide',
             'source' => 'wikimedia',
         ];
 
@@ -207,36 +362,49 @@ class WikimediaPhotoFetcher
             $request = Http::withHeaders(['Accept' => 'application/json'])->timeout(20);
 
             if ($token = $this->token()) {
-                $request = $request->withHeaders(['Authorization' => 'Bearer ' . $token]);
+                $request = $request->withHeaders(['Authorization' => 'Bearer '.$token]);
             }
 
             $resp = $request->get('https://api.openverse.org/v1/images/', $params);
         } catch (\Throwable $e) {
-            Log::error("Openverse request failed for {$query}: " . $e->getMessage());
-            return null;
+            Log::error("Openverse request failed for {$query}: ".$e->getMessage());
+
+            return [];
         }
 
         // Token kedaluwarsa: buang cache lalu coba sekali lagi dengan token baru.
-        if ($resp->status() === 401 && $allowRetry && !config('services.openverse.token')) {
+        if ($resp->status() === 401 && $allowRetry && ! config('services.openverse.token')) {
             $this->forgetToken();
-            return $this->openverseWikimediaUrl($query, false);
+
+            return $this->openverseCandidates($query, false);
         }
 
-        if (!$resp->ok()) {
-            return null;
+        if (! $resp->ok()) {
+            return [];
         }
 
+        $out = [];
         foreach ($resp->json('results') ?? [] as $r) {
-            $u = $r['url'] ?? '';
-            if (is_string($u) && str_contains($u, 'upload.wikimedia.org')) {
-                return $u;
+            $url = $r['url'] ?? '';
+
+            if (is_string($url) && str_contains($url, 'upload.wikimedia.org')) {
+                $out[] = [
+                    'url' => $url,
+                    'title' => (string) ($r['title'] ?? ''),
+                    'source' => 'openverse',
+                ];
             }
         }
 
-        return null;
+        return $out;
     }
 
-    protected function commonsApiUrl(string $query): ?string
+    /**
+     * Kandidat dari Wikimedia Commons API, diurutkan dari skor tertinggi.
+     *
+     * @return array<int, array{url: string, title: string, source: string, score: int}>
+     */
+    protected function commonsCandidates(string $query): array
     {
         try {
             $resp = Http::withHeaders(['User-Agent' => $this->userAgent()])
@@ -247,44 +415,54 @@ class WikimediaPhotoFetcher
                     'generator' => 'search',
                     'gsrsearch' => "filetype:bitmap {$query}",
                     'gsrnamespace' => '6',
-                    'gsrlimit' => '6',
+                    'gsrlimit' => (string) self::COMMONS_PAGE_SIZE,
                     'prop' => 'imageinfo',
                     'iiprop' => 'url|mime|size',
                     'iiurlwidth' => '1200',
                 ]);
         } catch (\Throwable $e) {
-            Log::error("Commons API request failed for {$query}: " . $e->getMessage());
-            return null;
+            Log::error("Commons API request failed for {$query}: ".$e->getMessage());
+
+            return [];
         }
 
-        if (!$resp->ok()) {
-            return null;
+        if (! $resp->ok()) {
+            return [];
         }
 
-        $best = null;
-        $bestScore = 0;
+        $out = [];
 
         foreach ($resp->json('query.pages') ?? [] as $page) {
             $info = $page['imageinfo'][0] ?? null;
-            if (!$info || ($info['mime'] ?? '') !== 'image/jpeg') {
+
+            if (! $info || ($info['mime'] ?? '') !== 'image/jpeg') {
                 continue;
             }
 
-            $title = mb_strtolower((string) ($page['title'] ?? ''));
-            $score = 0;
-            foreach (array_filter(preg_split('/\s+/', mb_strtolower($query))) as $needle) {
-                if (mb_strpos($title, (string) $needle) !== false) {
-                    $score++;
-                }
+            // Terlalu kecil tidak berguna sebagai foto lokasi.
+            if (($info['width'] ?? 0) < 640) {
+                continue;
             }
 
-            if ($score > $bestScore && ($info['width'] ?? 0) >= 640) {
-                $bestScore = $score;
-                $best = $info['thumburl'] ?? $info['url'] ?? null;
+            $url = $info['thumburl'] ?? $info['url'] ?? null;
+
+            if (! is_string($url) || $url === '') {
+                continue;
             }
+
+            $title = (string) ($page['title'] ?? '');
+
+            $out[] = [
+                'url' => $url,
+                'title' => $title,
+                'source' => 'commons',
+                'score' => $this->relevanceScore($title, $query),
+            ];
         }
 
-        return is_string($best) ? $best : null;
+        usort($out, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice($out, 0, self::COMMONS_PAGE_SIZE);
     }
 
     protected function userAgent(): string

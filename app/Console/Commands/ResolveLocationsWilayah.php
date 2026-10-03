@@ -10,37 +10,40 @@ use Illuminate\Console\Command;
 class ResolveLocationsWilayah extends Command
 {
     protected $signature = 'locations:resolve-wilayah
-                            {--nearest-km=50 : Ambang jarak fallback ke kabupaten terdekat untuk titik pesisir (km)}
-                            {--dry-run : Hanya tampilkan apa yang akan di-update tanpa menyentuh database}';
+                            {--nearest-km=50 : Ambang jarak fallback ke centroid kabupaten terdekat (km)}
+                            {--proximity-km=30 : Ambang jarak fallback ke sisi poligon kabupaten (km)}
+                            {--recheck : Nilai ulang lokasi yang SUDAH punya wilayah_id (default: hanya yang kosong)}
+                            {--dry-run : Tampilkan rencana perubahan tanpa menyentuh database}';
 
     protected $description = 'Isi wilayah_id setiap lokasi tempat dengan kabupaten/kota yang memuat titiknya';
 
     public function handle(WilayahResolver $resolver): int
     {
         $nearestKm = (float) $this->option('nearest-km');
-        $dryRun = $this->option('dry-run');
+        $proximityKm = (float) $this->option('proximity-km');
+        $recheck = (bool) $this->option('recheck');
+        $dryRun = (bool) $this->option('dry-run');
 
-        $places = Location::query()
+        $query = Location::query()
             ->with('category')
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES))
-            ->orderBy('id')
-            ->get();
+            ->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES));
 
-        if ($places->isEmpty()) {
-            $this->info('Tidak ada lokasi tempat untuk diproses.');
-            return 0;
+        // Backfill default aman: hanya mengisi yang kosong. Menimpa nilai yang
+        // sudah ada hanya dilakukan bila operator benar-benar meminta --recheck,
+        // karena beberapa wilayah bertetangga bisa tertukar secara sah.
+        if (! $recheck) {
+            $query->whereNull('wilayah_id');
         }
 
-        if ($dryRun) {
-            $this->info("Dry-run: akan memproses {$places->count()} lokasi tanpa menyentuh database.");
-            // Tampilkan ringkasan 7 lokasi "tempat" yang butuh wilayah_id
-            $placeLocs = $places->filter(fn ($l) => in_array(optional($l->category)->name, ['Wisata Alam', 'Wisata Budaya', 'Wisata Religi', 'Wisata Sejarah', 'Wisata Kuliner', 'Tempat Umum', 'Tempat Ibadah', 'Transportasi Umum', 'Tempat Pendidikan'], true));
-            foreach ($placeLocs as $loc) {
-                $this->line("  #{$loc->id} {$loc->name} | {$loc->category->name} | {$loc->latitude}, {$loc->longitude}");
-            }
-            $this->info("Selesai! (dry-run: tidak ada data yang disimpan)");
+        $places = $query->orderBy('id')->get();
+
+        if ($places->isEmpty()) {
+            $this->info($recheck
+                ? 'Tidak ada lokasi tempat untuk diproses.'
+                : 'Semua lokasi tempat sudah punya wilayah_id (gunakan --recheck untuk nilai ulang).');
+
             return 0;
         }
 
@@ -49,18 +52,20 @@ class ResolveLocationsWilayah extends Command
 
         $updated = 0;
         $skipped = 0;
+        $changes = [];
 
         foreach ($places as $loc) {
-            $region = $resolver->resolve((float) $loc->latitude, (float) $loc->longitude);
-
-            // Kalau resolve cuma dapat poligon provinsi utuh (nama == kategori),
-            // berarti titik di tepi pantai/laut yang tak masuk poligon kabupaten.
-            // Fallback ke kabupaten terdekat (centroid) agar badge lebih spesifik.
-            if ($region === null || ($region['name'] === $region['provinsi'] && $nearestKm > 0)) {
-                $region = $resolver->resolveNearest((float) $loc->latitude, (float) $loc->longitude, $nearestKm);
-            }
+            [$region, $method] = $this->resolveRegion($resolver, $loc, $proximityKm, $nearestKm);
 
             if ($region && (int) $loc->wilayah_id !== $region['id']) {
+                $changes[] = [
+                    'id' => $loc->id,
+                    'name' => $loc->name,
+                    'from' => $loc->wilayah_id,
+                    'to' => $region,
+                    'method' => $method,
+                ];
+
                 if (! $dryRun) {
                     $loc->wilayah_id = $region['id'];
                     $loc->saveQuietly();
@@ -75,8 +80,70 @@ class ResolveLocationsWilayah extends Command
 
         $bar->finish();
         $this->newLine(2);
-        $this->info("Selesai! Terisi: {$updated}, Terlewati (sudah benar / tak ada wilayah): {$skipped}" . ($dryRun ? ' [dry-run]' : ''));
+
+        if ($changes !== []) {
+            $wilayahNames = Location::whereIn('id', array_filter(array_column($changes, 'from')))
+                ->pluck('name', 'id');
+
+            $rows = [];
+            foreach ($changes as $c) {
+                $from = $c['from']
+                    ? $wilayahNames[$c['from']]." (#{$c['from']})"
+                    : '-';
+                $jarak = isset($c['to']['jarak_km']) ? number_format($c['to']['jarak_km'], 2).' km' : '-';
+                $rows[] = [
+                    $c['id'],
+                    $c['name'],
+                    $from,
+                    "{$c['to']['name']} ({$c['to']['provinsi']})",
+                    $c['method'],
+                    $jarak,
+                ];
+            }
+
+            $this->table(['ID', 'Nama', 'Dari', 'Menjadi', 'Metode', 'Jarak'], $rows);
+        }
+
+        $suffix = $dryRun ? ' [dry-run: tidak ada data yang disimpan]' : '';
+        $this->info("Selesai! Terisi: {$updated}, Terlewati (sudah benar / tak ada wilayah): {$skipped}{$suffix}");
 
         return 0;
+    }
+
+    /**
+     * @return array{0: array<string, mixed>|null, 1: string}
+     */
+    private function resolveRegion(WilayahResolver $resolver, Location $loc, float $proximityKm, float $nearestKm): array
+    {
+        $lat = (float) $loc->latitude;
+        $lng = (float) $loc->longitude;
+
+        $region = $resolver->resolve($lat, $lng);
+        if ($region && $region['name'] !== $region['provinsi']) {
+            return [$region, 'poligon'];
+        }
+
+        // Titik kepulauan / titik di laut: ukur jarak ke sisi poligon, bukan centroid.
+        if ($proximityKm > 0) {
+            $near = $resolver->resolveByProximity($lat, $lng, $proximityKm);
+            if ($near) {
+                return [$near, 'proksimitas'];
+            }
+        }
+
+        // Poligon provinsi utuh yang tertangkap resolve() tetap dipakai sebagai
+        // jawaban terakhir agar lokasi tidak kehilangan label sama sekali.
+        if ($region) {
+            return [$region, 'provinsi'];
+        }
+
+        if ($nearestKm > 0) {
+            $near = $resolver->resolveNearest($lat, $lng, $nearestKm);
+            if ($near) {
+                return [$near, 'centroid'];
+            }
+        }
+
+        return [null, 'tidak ditemukan'];
     }
 }

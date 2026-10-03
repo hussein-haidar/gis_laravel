@@ -19,7 +19,7 @@ class WilayahResolver
         $matches = [];
 
         foreach ($this->wilayahRegions() as $region) {
-            if (!$this->inBounds($region, $latitude, $longitude)) {
+            if (! $this->inBounds($region, $latitude, $longitude)) {
                 continue;
             }
             if ($this->contains($region, $latitude, $longitude)) {
@@ -27,7 +27,7 @@ class WilayahResolver
             }
         }
 
-        if (!$matches) {
+        if (! $matches) {
             return null;
         }
 
@@ -42,7 +42,7 @@ class WilayahResolver
     private function boundArea(array $region): float
     {
         $b = $region['bounds'] ?? null;
-        if (!$b) {
+        if (! $b) {
             return PHP_FLOAT_MAX;
         }
 
@@ -78,6 +78,127 @@ class WilayahResolver
         }
 
         return $nearest;
+    }
+
+    /**
+     * Fallback berbasis jarak ke PERMUKAAN poligon, bukan ke titik pusat.
+     *
+     * Wilayah kepulauan (Banda, Karimunjawa, Moyo, Wakatobi) dan titik yang
+     * berada di laut hampir selalu gagal pada ray-casting karena poligon oblast
+     * disederhanakan dan tidak memuat gugusan pulau kecil. Mengukur jarak ke
+     * sisi poligon membuat titik tersebut tetap diarahkan ke kabupaten yang benar.
+     */
+    public function resolveByProximity(float $latitude, float $longitude, float $maxKm = 30.0): ?array
+    {
+        $best = null;
+        $bestKm = PHP_FLOAT_MAX;
+
+        foreach ($this->wilayahRegions() as $region) {
+            // Poligon provinsi utuh tidak pernah jadi jawaban "terdekat".
+            if (mb_strtoupper($region['name']) === mb_strtoupper((string) $region['provinsi'])) {
+                continue;
+            }
+
+            $bounds = $region['bounds'] ?? null;
+            if ($bounds && ! $this->nearBounds($bounds, $latitude, $longitude, $maxKm)) {
+                continue;
+            }
+
+            $km = $this->polygonDistanceKm($region, $latitude, $longitude);
+            if ($km === null || $km > $maxKm || $km >= $bestKm) {
+                continue;
+            }
+
+            $bestKm = $km;
+            $best = $region;
+            $best['jarak_km'] = $km;
+        }
+
+        return $best;
+    }
+
+    /**
+     * Prefilter cepat: apakah kotak pembatas poligon masih mungkin berada
+     * dalam $maxKm dari titik? Menghemat perhitungan jarak titik-ke-sisi.
+     */
+    private function nearBounds(array $b, float $lat, float $lng, float $maxKm): bool
+    {
+        $dLat = $maxKm / 110.574;
+        $dLng = $maxKm / max(1e-6, 111.320 * cos(deg2rad($lat)));
+
+        return $lng >= $b[0] - $dLng && $lat >= $b[1] - $dLat
+            && $lng <= $b[2] + $dLng && $lat <= $b[3] + $dLat;
+    }
+
+    /**
+     * Jarak terdekat (km) dari titik ke salah satu sisi poligon wilayah.
+     */
+    private function polygonDistanceKm(array $region, float $lat, float $lng): ?float
+    {
+        $geometry = $region['geometry'] ?? null;
+        if (! is_array($geometry) || ! isset($geometry['type'])) {
+            return null;
+        }
+
+        $type = $geometry['type'];
+        $polys = match ($type) {
+            'Polygon' => [$geometry['coordinates']],
+            'MultiPolygon' => $geometry['coordinates'] ?? [],
+            default => [],
+        };
+
+        $best = null;
+        foreach ($polys as $rings) {
+            foreach ($rings as $ring) {
+                $count = count($ring);
+                if ($count < 2) {
+                    continue;
+                }
+                for ($i = 0, $j = $count - 1; $i < $count; $j = $i++) {
+                    $km = $this->segmentKm(
+                        $lat,
+                        $lng,
+                        (float) $ring[$j][1],
+                        (float) $ring[$j][0],
+                        (float) $ring[$i][1],
+                        (float) $ring[$i][0]
+                    );
+                    if ($best === null || $km < $best) {
+                        $best = $km;
+                    }
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Jarak titik ke satu segmen garis (km), aproksimasi equirectangular.
+     */
+    private function segmentKm(float $lat, float $lng, float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $kx = 111.320 * cos(deg2rad(($lat + $lat1 + $lat2) / 3));
+        $ky = 110.574;
+
+        $ax = ($lng1 - $lng) * $kx;
+        $ay = ($lat1 - $lat) * $ky;
+        $bx = ($lng2 - $lng) * $kx;
+        $by = ($lat2 - $lat) * $ky;
+
+        $dx = $bx - $ax;
+        $dy = $by - $ay;
+        if ($dx == 0.0 && $dy == 0.0) {
+            return sqrt($ax * $ax + $ay * $ay);
+        }
+
+        $t = -(($ax * $dx) + ($ay * $dy)) / (($dx * $dx) + ($dy * $dy));
+        $t = max(0.0, min(1.0, $t));
+
+        $cx = $ax + $t * $dx;
+        $cy = $ay + $t * $dy;
+
+        return sqrt($cx * $cx + $cy * $cy);
     }
 
     private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
@@ -125,7 +246,7 @@ class WilayahResolver
      */
     private function computeBounds(?array $geometry): ?array
     {
-        if (!is_array($geometry) || !isset($geometry['coordinates'])) {
+        if (! is_array($geometry) || ! isset($geometry['coordinates'])) {
             return null;
         }
 
@@ -142,10 +263,18 @@ class WilayahResolver
             foreach ($rings as $ring) {
                 foreach ($ring as $point) {
                     [$lng, $lat] = [(float) $point[0], (float) $point[1]];
-                    if ($lat < $minLat) $minLat = $lat;
-                    if ($lat > $maxLat) $maxLat = $lat;
-                    if ($lng < $minLng) $minLng = $lng;
-                    if ($lng > $maxLng) $maxLng = $lng;
+                    if ($lat < $minLat) {
+                        $minLat = $lat;
+                    }
+                    if ($lat > $maxLat) {
+                        $maxLat = $lat;
+                    }
+                    if ($lng < $minLng) {
+                        $minLng = $lng;
+                    }
+                    if ($lng > $maxLng) {
+                        $maxLng = $lng;
+                    }
                 }
             }
         }
@@ -160,7 +289,7 @@ class WilayahResolver
     private function inBounds(array $region, float $lat, float $lng): bool
     {
         $b = $region['bounds'] ?? null;
-        if (!$b) {
+        if (! $b) {
             return true; // tanpa bounds, tes penuh
         }
 
@@ -173,7 +302,7 @@ class WilayahResolver
     private function contains(array $region, float $lat, float $lng): bool
     {
         $geometry = $region['geometry'] ?? null;
-        if (!is_array($geometry) || !isset($geometry['type'])) {
+        if (! is_array($geometry) || ! isset($geometry['type'])) {
             return false;
         }
 
@@ -202,12 +331,12 @@ class WilayahResolver
     private function pointInPolygon(array $polygon, float $lat, float $lng): bool
     {
         $rings = array_values($polygon);
-        if (!$rings) {
+        if (! $rings) {
             return false;
         }
 
         $outer = $rings[0];
-        if (!$this->rayCast($outer, $lat, $lng)) {
+        if (! $this->rayCast($outer, $lat, $lng)) {
             return false;
         }
 
@@ -235,7 +364,7 @@ class WilayahResolver
                 && ($lng < ($xj - $xi) * ($lat - $yi) / ($yj - $yi) + $xi);
 
             if ($intersects) {
-                $inside = !$inside;
+                $inside = ! $inside;
             }
         }
 
