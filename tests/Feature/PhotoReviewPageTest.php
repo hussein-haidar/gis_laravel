@@ -32,7 +32,7 @@ class PhotoReviewPageTest extends TestCase
 
         $role = Role::create(['name' => 'admin', 'label' => 'Admin']);
         $this->admin = User::factory()->create(['role_id' => $role->id]);
-        $this->tempat = Category::create(['name' => 'Wisata Alam']);
+        $this->tempat = Category::create(['name' => 'Wisata Alam', 'is_active' => true]);
     }
 
     private function photoLocation(string $name, string $status = Location::PHOTO_PENDING): Location
@@ -144,6 +144,44 @@ class PhotoReviewPageTest extends TestCase
         $loc->update(['photo_review_status' => Location::PHOTO_APPROVED]);
 
         $this->assertNotNull($loc->fresh()->photo_url);
+    }
+
+    public function test_pending_location_is_still_listed_publicly_with_its_name(): void
+    {
+        $loc = $this->photoLocation('Candi Prambanan');
+
+        // Aturan: menunggu = fotonya yang disembunyikan, BUKAN nama
+        // tempatnya. Lokasi harus tetap tampil di daftar publik.
+        $response = $this->get(route('map.index'));
+
+        $response->assertOk();
+        $response->assertSee('Candi Prambanan');
+        $response->assertDontSee($loc->photo);
+    }
+
+    public function test_pending_location_keeps_its_map_marker_but_has_no_photo_in_geojson(): void
+    {
+        $loc = $this->photoLocation('Candi Prambanan');
+
+        $response = $this->getJson(route('geojson.index', ['compact' => 1]));
+
+        $response->assertOk();
+
+        $feature = collect($response->json('features'))->firstWhere('id', $loc->id);
+
+        $this->assertNotNull($feature, 'Lokasi menunggu harus tetap punya marker di peta.');
+        $this->assertSame('Candi Prambanan', $feature['properties']['name']);
+        $this->assertNull($feature['properties']['photo_url']);
+    }
+
+    public function test_approved_location_shows_both_name_and_photo_publicly(): void
+    {
+        $loc = $this->photoLocation('Pantai Kuta', Location::PHOTO_APPROVED);
+
+        $this->get(route('map.index'))
+            ->assertOk()
+            ->assertSee('Pantai Kuta')
+            ->assertSee($loc->photo);
     }
 
     public function test_approve_without_selection_is_rejected(): void
