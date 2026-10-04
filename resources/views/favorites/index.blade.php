@@ -27,7 +27,11 @@
                             <div class="card-img-top bg-light" style="height:150px;"></div>
                         @endif
                         <div class="card-body">
-                            <h2 class="h6 mb-1">{{ $loc->name }}</h2>
+                            {{-- Sama seperti grid beranda: nama disembunyikan
+                                 sampai foto lokasi disetujui. --}}
+                            @if ($loc->photo_url)
+                                <h2 class="h6 mb-1">{{ $loc->name }}</h2>
+                            @endif
                             @if ($loc->category)
                                 <span class="badge text-white mb-2" style="background:{{ $loc->category->color }}">{{ $loc->category->name }}</span>
                             @endif

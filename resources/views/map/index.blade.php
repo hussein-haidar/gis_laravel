@@ -256,11 +256,20 @@
                         <div class="bg-light" style="height:180px;"></div>
                     @endif
                     <div class="card-body">
-                        <h3 class="h6 mb-1">{{ $location->name }}</h3>
+                        {{-- Lokasi yang fotonya belum ada / belum disetujui hanya
+                             tampil sebagai kotak abu-abu + kategori: nama dan
+                             deskripsinya disembunyikan sampai foto sesuai. --}}
+                        @if ($location->photo_url)
+                            <h3 class="h6 mb-1">{{ $location->name }}</h3>
+                        @endif
                         @if ($location->category)
                             <span class="badge text-white mb-2 px-3 py-2" style="background:{{ $location->category->color }}; text-shadow: 0 1px 2px rgba(0,0,0,0.4);">{{ $location->category->name }}</span>
                         @endif
-                        <p class="small text-muted mb-0">{{ Str::limit($location->description, 80) }}</p>
+                        @if ($location->photo_url)
+                            <p class="small text-muted mb-0">{{ Str::limit($location->description, 80) }}</p>
+                        @else
+                            <p class="small text-muted mb-0">Foto sedang diverifikasi.</p>
+                        @endif
                     </div>
                 </a>
             </div>

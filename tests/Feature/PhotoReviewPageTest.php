@@ -146,17 +146,20 @@ class PhotoReviewPageTest extends TestCase
         $this->assertNotNull($loc->fresh()->photo_url);
     }
 
-    public function test_pending_location_is_still_listed_publicly_with_its_name(): void
+    public function test_pending_location_is_listed_publicly_but_its_name_is_hidden(): void
     {
         $loc = $this->photoLocation('Candi Prambanan');
 
-        // Aturan: menunggu = fotonya yang disembunyikan, BUKAN nama
-        // tempatnya. Lokasi harus tetap tampil di daftar publik.
+        // Aturan: menunggu = foto disembunyikan DAN nama tempat disembunyikan
+        // di daftar publik (kotak abu-abu + kategori saja). Lokasi tetap
+        // ada di peta lewat koordinat/marker-nya.
         $response = $this->get(route('map.index'));
 
         $response->assertOk();
-        $response->assertSee('Candi Prambanan');
+        $response->assertDontSee('Candi Prambanan');
         $response->assertDontSee($loc->photo);
+        $response->assertSee('Wisata Alam');
+        $response->assertSee('Foto sedang diverifikasi.');
     }
 
     public function test_pending_location_keeps_its_map_marker_but_has_no_photo_in_geojson(): void
