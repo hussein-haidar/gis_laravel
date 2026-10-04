@@ -2,6 +2,16 @@
 
 @section('title', 'Profil Saya')
 
+@php
+    // Halaman balik sesuai role: Super Admin / Admin ke dashboard-nya,
+    // User biasa ke peta.
+    $urlKembali = match (true) {
+        $user->hasRole('super_admin') => route('super-admin.dashboard'),
+        $user->hasRole('admin') => route('admin.dashboard'),
+        default => route('map.index'),
+    };
+@endphp
+
 @section('content')
 <div class="row justify-content-center">
     <div class="col-lg-8">
@@ -17,7 +27,7 @@
                     </div>
                 @endif
 
-                <form action="{{ $user->hasRole('super_admin') ? route('super-admin.profile.update') : route('admin.profile.update') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="row mb-4">
                         <div class="col-md-3 text-center">
@@ -86,7 +96,7 @@
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Simpan Perubahan</button>
-                        <a href="{{ auth()->user()->hasRole('super_admin') ? route('super-admin.dashboard') : route('admin.dashboard') }}" class="btn btn-outline-secondary">Batal</a>
+                        <a href="{{ $urlKembali }}" class="btn btn-outline-secondary">Batal</a>
                     </div>
                 </form>
             </div>

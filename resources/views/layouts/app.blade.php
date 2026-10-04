@@ -113,10 +113,8 @@
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('super-admin.activity-log') }}">Log Aktivitas</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('super-admin.profile') }}"><i class="bi bi-person me-2"></i> Profil</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.password.form') }}">Ganti Password</a></li>
+                                {{-- Profil dan Ganti Password tidak ada di sini: keduanya
+                                     sudah ada di dropdown user (avatar + nama) di navbar. --}}
                             </ul>
                         </li>
                     @elseif (Auth::user()->hasRole('admin'))
@@ -125,7 +123,6 @@
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{{ route('admin.dashboard') }}">Dashboard Statistik</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.index') }}">Kelola Lokasi</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.create') }}">Tambah Lokasi</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.categories.index') }}">Kelola Kategori</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.users.index') }}">Kelola User</a></li>
                                 <li><hr class="dropdown-divider"></li>
@@ -139,7 +136,9 @@
                                     <a class="dropdown-item d-flex justify-content-between align-items-center gap-3"
                                        href="{{ route('admin.photo-review.index') }}">
                                         <span>Verifikasi Foto</span>
-                                        @php($pendingPhotos = \App\Models\Location::awaitingPhotoReview()->count())
+                                        @php
+                                            $pendingPhotos = \App\Models\Location::awaitingPhotoReview()->count();
+                                        @endphp
                                         @if ($pendingPhotos > 0)
                                             <span class="badge bg-warning text-dark">{{ $pendingPhotos }}</span>
                                         @endif
@@ -147,21 +146,66 @@
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.profile') }}"><i class="bi bi-person me-2"></i> Profil</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.password.form') }}">Ganti Password</a></li>
+                                {{-- Profil dan Ganti Password tidak ada di sini: keduanya
+                                     sudah ada di dropdown user (avatar + nama) di navbar. --}}
                             </ul>
                         </li>
                     @endif
-                    <li class="nav-item">
-                        <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-link nav-link" style="text-decoration:none;">
-                                <span class="badge bg-{{ match(Auth::user()->role?->name ?? '') { 'super_admin' => 'danger', 'admin' => 'primary', default => 'secondary' } }}">{{ Auth::user()->role?->label ?? 'User' }}</span>
-                                {{ Auth::user()->name }} — {{ __('messages.nav_logout') }}
-                            </button>
-                        </form>
+                    @php
+    // Tautan profil & ganti password selalu lewat route generik (/profil)
+    // supaya navbar sama untuk Admin, Super Admin, dan User.
+    $avatarPath = Auth::user()->avatar ? asset('storage/'.Auth::user()->avatar) : null;
+    $inisial = collect(preg_split('/\s+/', trim(Auth::user()->name)))
+        ->filter()
+        ->take(2)
+        ->map(fn ($kata) => mb_strtoupper(mb_substr($kata, 0, 1)))
+        ->implode('') ?: '?';
+    $warnaBadge = match (Auth::user()->role?->name) {
+        'super_admin' => 'danger',
+        'admin' => 'primary',
+        default => 'secondary',
+    };
+@endphp
+                    {{-- Menu user: hanya nama + logout. Foto profil ada di avatar, dan
+                         Profil/Ganti Password/Logout ada di dropdown ini. --}}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false" title="{{ Auth::user()->name }}">
+                            @if ($avatarPath)
+                                <img src="{{ $avatarPath }}" alt="{{ Auth::user()->name }}" width="28" height="28"
+                                     class="rounded-circle border" style="object-fit: cover;">
+                            @else
+                                <span class="rounded-circle bg-{{ $warnaBadge }} text-white d-inline-flex align-items-center justify-content-center"
+                                      style="width:28px;height:28px;font-size:.75rem;font-weight:700;">{{ $inisial }}</span>
+                            @endif
+                            <span class="d-none d-lg-inline">{{ Auth::user()->name }}</span>
+                            <span class="badge bg-{{ $warnaBadge }} d-none d-xl-inline">{{ Auth::user()->role?->label ?? 'User' }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li class="px-3 py-2 border-bottom">
+                                <div class="fw-semibold text-truncate">{{ Auth::user()->name }}</div>
+                                <div class="small text-body-secondary text-truncate">{{ Auth::user()->email }}</div>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ route('profile') }}">
+                                    <i class="bi bi-person me-2"></i> Profil
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ route('password.change') }}">
+                                    <i class="bi bi-key me-2"></i> Ganti Password
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form action="{{ route('logout') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-box-arrow-right me-2"></i> {{ __('messages.nav_logout') }}
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
                     </li>
                 @else
                     <li class="nav-item">

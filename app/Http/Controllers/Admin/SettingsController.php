@@ -20,16 +20,23 @@ class SettingsController extends Controller
     {
         $group = $request->query('group', 'general');
 
+        // Semua group selalu dimuat. Tab di halaman ini dipindah klien lewat
+        // Bootstrap, bukan lewat reload, jadi memfilter di query membuat tab
+        // selain group aktif tampak kosong.
         $settings = Setting::query()
-            ->when($group !== 'all', function ($query) use ($group) {
-                $query->where('group', $group);
-            })
             ->orderBy('group')
             ->orderBy('label')
             ->get()
             ->groupBy('group');
 
-        $groups = Setting::select('group')->distinct()->pluck('group')->toArray();
+        $groups = Setting::select('group')->distinct()->orderBy('group')->pluck('group')->toArray();
+
+        // Group yang tidak punya isi tidak dijadikan tab.
+        $groups = array_values(array_intersect($groups, array_keys($settings->all())));
+
+        if ($group !== 'all' && ! in_array($group, $groups, true)) {
+            $group = $groups[0] ?? 'all';
+        }
 
         $aiModels = $groq->enabled() ? $groq->availableModels() : [];
 
@@ -75,20 +82,20 @@ class SettingsController extends Controller
             $key = $settingData['key'];
             $setting = Setting::where('key', $key)->first();
 
-            if (!$setting) {
+            if (! $setting) {
                 continue;
             }
 
             $value = $settingData['value'] ?? null;
 
-            if ($setting->type === 'boolean' && !isset($settingData['value'])) {
+            if ($setting->type === 'boolean' && ! isset($settingData['value'])) {
                 $value = '0';
             }
 
-            $bolehDihapus = !empty($semuaInput[$key]['clear']);
+            $bolehDihapus = ! empty($semuaInput[$key]['clear']);
 
             // Secret kosong berarti "jangan ubah", bukan "hapus".
-            if ($setting->is_secret && trim((string) $value) === '' && !$bolehDihapus) {
+            if ($setting->is_secret && trim((string) $value) === '' && ! $bolehDihapus) {
                 continue;
             }
 
@@ -105,11 +112,11 @@ class SettingsController extends Controller
 
             $hasil = $groq->validateKey($nilaiBaru['groq_api_key']['value'], $model);
 
-            if (!$hasil['valid']) {
+            if (! $hasil['valid']) {
                 return redirect()
                     ->route('admin.settings.index', ['group' => $request->input('current_group', 'ai')])
                     ->withInput()
-                    ->with('error', 'API key tidak disimpan karena tidak valid: ' . $hasil['message']);
+                    ->with('error', 'API key tidak disimpan karena tidak valid: '.$hasil['message']);
             }
 
             // Simpan pesan sukses dari tes validasi supaya terlihat di halaman.
@@ -135,7 +142,7 @@ class SettingsController extends Controller
                 'new_values' => $setting->is_secret
                     ? ['value' => $data['value'] !== '' ? '••••••••' : '']
                     : ['value' => $data['value']],
-                'description' => 'Memperbarui pengaturan: ' . $setting->label,
+                'description' => 'Memperbarui pengaturan: '.$setting->label,
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);

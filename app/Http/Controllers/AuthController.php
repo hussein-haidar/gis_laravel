@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Auth\Events\PasswordReset;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -85,7 +84,7 @@ class AuthController extends Controller
 
         $user = User::where('google_id', $googleUser->getId())->first();
 
-        if (!$user) {
+        if (! $user) {
             $user = User::where('email', $googleUser->getEmail())->first();
 
             if ($user) {
@@ -169,7 +168,7 @@ class AuthController extends Controller
         );
 
         return $status === Password::PASSWORD_RESET
-            ? redirect()->route('admin.locations.index')->with('success', 'Password berhasil direset.')
+            ? redirect()->route('login')->with('success', 'Password berhasil direset.')
             : back()->withErrors(['email' => 'Token reset tidak valid atau kadaluarsa.']);
     }
 
@@ -196,7 +195,7 @@ class AuthController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.locations.index')
+            ->route('password.change')
             ->with('success', 'Password berhasil diganti.');
     }
 
@@ -211,8 +210,11 @@ class AuthController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            // Bagian "Ganti Password (Opsional)" di form profil.
+            'current_password' => ['nullable', 'string'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
 
         if ($request->hasFile('avatar')) {
@@ -220,7 +222,23 @@ class AuthController extends Controller
             $data['avatar'] = $path;
         }
 
-        $user->update($data);
+        // Password hanya diubah kalau kedua field baru benar-benar diisi.
+        $passwordBaru = trim((string) ($data['password'] ?? ''));
+        $passwordLama = trim((string) ($data['current_password'] ?? ''));
+
+        if ($passwordBaru !== '') {
+            if ($passwordLama === '' || ! Hash::check($passwordLama, $user->password)) {
+                return back()
+                    ->withInput($request->except(['current_password', 'password', 'password_confirmation', 'avatar']))
+                    ->withErrors(['current_password' => 'Password saat ini salah.']);
+            }
+
+            $user->password = Hash::make($passwordBaru);
+        }
+
+        unset($data['password'], $data['current_password'], $data['password_confirmation']);
+
+        $user->fill($data)->save();
 
         return back()->with('success', 'Profil berhasil diperbarui.');
     }

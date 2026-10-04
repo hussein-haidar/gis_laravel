@@ -141,14 +141,18 @@
             }
         });
 
-        const locations = @json($locations->map(fn($l) => [
-            'name' => $l->name,
-            'lat' => (float) $l->latitude,
-            'lng' => (float) $l->longitude,
-            'distance' => number_format($l->distance, 2, ',', '.'),
-            'color' => $l->category?->color ?? '#9ca3af',
-            'category' => $l->category?->name ?? '',
-        ]));
+        @php
+    $locationsJson = $locations->map(fn ($l) => [
+        'name' => $l->name,
+        'lat' => (float) $l->latitude,
+        'lng' => (float) $l->longitude,
+        'distance' => number_format($l->distance, 2, ',', '.'),
+        'color' => $l->category?->color ?? '#9ca3af',
+        'category' => $l->category?->name ?? '',
+    ]);
+@endphp
+
+        const locations = @json($locationsJson);
 
         locations.forEach(function (loc) {
             const icon = L.divIcon({

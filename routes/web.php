@@ -31,6 +31,13 @@ Route::middleware('auth')->group(function () {
     Route::get('pemberitahuan/terbaru', [NotificationController::class, 'latest'])->name('notifications.latest');
     Route::post('pemberitahuan/baca-semua', [NotificationController::class, 'readAll'])->name('notifications.read-all');
     Route::post('pemberitahuan/{notification}/baca', [NotificationController::class, 'read'])->name('notifications.read');
+
+    // Profil & ganti password untuk semua role, supaya menu di navbar (avatar
+    // + nama + logout) selalu punya tujuan yang sama apa pun role-nya.
+    Route::get('profil', [AuthController::class, 'showProfile'])->name('profile');
+    Route::post('profil', [AuthController::class, 'updateProfile'])->name('profile.update');
+    Route::get('ganti-password', [AuthController::class, 'showPasswordForm'])->name('password.change');
+    Route::post('ganti-password', [AuthController::class, 'changePassword'])->name('password.change.update');
 });
 
 Route::middleware('auth')->group(function () {

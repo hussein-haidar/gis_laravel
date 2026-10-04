@@ -82,7 +82,7 @@
                 <input type="hidden" name="current_group" value="{{ $group }}">
 
                 <div class="tab-content" id="settingsTabContent">
-                    @foreach ($settings as $g => $groupSettings)
+                    @forelse ($settings as $g => $groupSettings)
                         <div class="tab-pane fade {{ $group === $g ? 'show active' : '' }}" id="panel-{{ $g }}" role="tabpanel">
                             @foreach ($groupSettings as $setting)
                                 <div class="mb-3">
@@ -171,7 +171,55 @@
                                 </div>
                             @endforeach
                         </div>
-                    @endforeach
+                    @empty
+                        <div class="alert alert-warning mb-0">Belum ada pengaturan yang bisa ditampilkan.</div>
+                    @endforelse
+
+                    {{-- Tab "Semua": ringkasan semua group. Read-only supaya tidak
+                         bentrok dengan input di tab per group. --}}
+                    <div class="tab-pane fade {{ $group === 'all' ? 'show active' : '' }}" id="panel-all" role="tabpanel">
+                        @forelse ($settings as $g => $groupSettings)
+                            <h6 class="text-uppercase small text-body-secondary mt-3">{{ ucfirst($g) }}</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Pengaturan</th>
+                                            <th>Kunci</th>
+                                            <th class="text-end">Nilai</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($groupSettings as $setting)
+                                            <tr>
+                                                <td>
+                                                    {{ $setting->label }}
+                                                    @if ($setting->is_secret)
+                                                        <span class="badge bg-warning text-dark ms-1">Secret</span>
+                                                    @endif
+                                                </td>
+                                                <td><code class="small">{{ $setting->key }}</code></td>
+                                                <td class="text-end">
+                                                    @if ($setting->is_secret)
+                                                        {{ $setting->hasStoredSecret() ? 'Tersimpan (••••••••)' : 'Belum diisi' }}
+                                                    @elseif ($setting->type === 'boolean')
+                                                        {{ $setting->value ? 'Aktif' : 'Tidak aktif' }}
+                                                    @else
+                                                        {{ $setting->value !== '' ? $setting->value : '—' }}
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @empty
+                            <div class="alert alert-warning mb-0">Belum ada pengaturan yang bisa ditampilkan.</div>
+                        @endforelse
+                        <p class="form-text mt-2">
+                            Untuk mengubah nilai, buka tab groupnya lalu tekan Simpan Perubahan.
+                        </p>
+                    </div>
                 </div>
 
                 <div class="d-flex gap-2 mt-3">

@@ -7,7 +7,7 @@
 
     <div class="card" style="max-width: 520px;">
         <div class="card-body">
-            <form action="{{ route('admin.password.update') }}" method="POST">
+            <form action="{{ route('password.change.update') }}" method="POST">
                 @csrf
 
                 <div class="mb-3">
@@ -36,7 +36,7 @@
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Simpan Password</button>
-                    <a href="{{ route('admin.locations.index') }}" class="btn btn-secondary">Batal</a>
+                    <a href="{{ route('profile') }}" class="btn btn-secondary">Batal</a>
                 </div>
             </form>
         </div>

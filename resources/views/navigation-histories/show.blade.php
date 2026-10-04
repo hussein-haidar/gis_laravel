@@ -113,13 +113,16 @@
 @push('scripts')
     <script>
         (function () {
-            const history = @json([
-                'geometry' => $history->route_geometry ?: [],
-                'origin' => $history->origin_lat !== null ? [$history->origin_lat, $history->origin_lng] : null,
-                'orig_name' => $history->origin_name ?: 'Lokasi Saya (GPS)',
-                'dest' => [$history->dest_lat, $history->dest_lng],
-                'dest_name' => $history->dest_name,
-            ]);
+            @php
+    $historyJson = [
+        'geometry' => $history->route_geometry ?: [],
+        'origin' => $history->origin_lat !== null ? [$history->origin_lat, $history->origin_lng] : null,
+        'orig_name' => $history->origin_name ?: 'Lokasi Saya (GPS)',
+        'dest' => [$history->dest_lat, $history->dest_lng],
+        'dest_name' => $history->dest_name,
+    ];
+@endphp
+            const history = @json($historyJson);
 
             const map = L.map('history-map');
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
