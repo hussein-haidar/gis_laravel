@@ -751,6 +751,7 @@
             const openBtn = document.getElementById('legend-open-btn');
             if (openBtn) openBtn.classList.add('show');
 
+            // Selalu pojok KIRI bawah peta (bukan kanan), sesuai permintaan.
             const legend = L.control({ position: 'bottomleft' });
             legend.onAdd = function () {
                 const div = L.DomUtil.create('div', 'map-legend');
@@ -773,12 +774,14 @@
 
                 return div;
             };
-            legend.addTo(map);
+legend.addTo(map);
+                legend.setPosition('bottomleft');
 
             // Tombol pemicu tampilnya legend.
             if (openBtn) {
                 openBtn.addEventListener('click', function () {
-                    legend.addTo(map);
+legend.addTo(map);
+            legend.setPosition('bottomleft');
                     openBtn.classList.remove('show');
                     try { localStorage.setItem('mapLegendOpen', '1'); } catch (e) {}
                 });

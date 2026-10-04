@@ -46,6 +46,20 @@ class Location extends Model
     public const PHOTO_REJECTED = 'rejected';
 
     /**
+     * Lokasi yang boleh tampil publik.
+     *
+     * Semua foto wajib disetujui lebih dulu, jadi lokasi yang fotonya belum
+     * ada atau masih menunggu tidak boleh muncul sama sekali di situs:
+     * tidak ada marker, tidak ada koordinat, tidak ada nama di daftar.
+     * Lokasi seperti ini hanya terlihat oleh admin di halaman verifikasi.
+     */
+    public function scopePubliclyVisible($query)
+    {
+        return $query->whereNotNull('photo')
+            ->where('photo_review_status', self::PHOTO_APPROVED);
+    }
+
+    /**
      * Foto yang sudah disetujui admin dan belum digantikan sumber baru.
      * Lokasi tanpa foto selalu pending, karena tidak ada yang perlu disetujui.
      */

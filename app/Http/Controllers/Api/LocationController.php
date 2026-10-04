@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ActivityLog;
-use App\Models\Category;
 use App\Models\Location;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +14,7 @@ class LocationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Location::with('category')
+            ->publiclyVisible()
             ->whereHas('category', function ($q) {
                 $q->where('is_active', true);
             });
@@ -55,6 +54,8 @@ class LocationController extends Controller
 
     public function show(Location $location): JsonResponse
     {
+        abort_unless($location->photo && $location->photo_review_status === Location::PHOTO_APPROVED, 404);
+
         $location->load('category');
 
         return response()->json([
@@ -86,6 +87,7 @@ class LocationController extends Controller
         $radius = $request->radius;
 
         $locations = Location::with('category')
+            ->publiclyVisible()
             ->selectRaw('*, (
                 6371 * acos(
                     cos(radians(?)) * cos(radians(latitude)) *
@@ -127,6 +129,7 @@ class LocationController extends Controller
         $query = $request->q;
 
         $locations = Location::with('category')
+            ->publiclyVisible()
             ->where('name', 'like', "%{$query}%")
             ->orWhere('description', 'like', "%{$query}%")
             ->limit(20)

@@ -16,6 +16,7 @@ class MapController extends Controller
 
         $locations = Location::query()
             ->with('category')
+            ->publiclyVisible()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->whereHas('category', function ($q) {
@@ -41,7 +42,12 @@ class MapController extends Controller
 
     public function show(Location $location): View
     {
+        // Lokasi yang fotonya belum disetujui belum boleh tampil publik:
+        // halaman detailnya 404 supaya nama & koordinatnya tidak bocor.
+        abort_unless($location->photo && $location->photo_review_status === Location::PHOTO_APPROVED, 404);
+
         $locations = Location::whereKeyNot($location->getKey())
+            ->publiclyVisible()
             ->whereNotNull('latitude')->whereNotNull('longitude')
             ->whereHas('category', function ($q) {
                 $q->where('is_active', true)
@@ -51,6 +57,7 @@ class MapController extends Controller
 
         $nearest = Location::with('category')
             ->whereKeyNot($location->getKey())
+            ->publiclyVisible()
             ->whereHas('category', function ($q) {
                 $q->where('is_active', true)
                     ->whereIn('name', Category::PLACE_TYPES);

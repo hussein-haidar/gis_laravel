@@ -14,6 +14,7 @@ class GeoJsonController extends Controller
         $compact = $request->query('compact') === '1';
 
         $locations = Location::with(['category', 'wilayah.category'])
+            ->publiclyVisible()
             ->whereHas('category', function ($q) {
                 $q->where('is_active', true);
             })
@@ -40,7 +41,7 @@ class GeoJsonController extends Controller
                 'photo_url' => $location->photo_url,
                 'latitude' => (float) $location->latitude,
                 'longitude' => (float) $location->longitude,
-                'is_wilayah' => !$isPlaceType,
+                'is_wilayah' => ! $isPlaceType,
                 'wilayah' => $location->wilayah?->name,
                 'provinsi' => $location->wilayah?->category?->name,
             ];
@@ -81,10 +82,12 @@ class GeoJsonController extends Controller
 
     public function show(Location $location): JsonResponse
     {
+        abort_unless($location->photo && $location->photo_review_status === Location::PHOTO_APPROVED, 404);
+
         $location->load(['category', 'wilayah.category']);
 
         $geometry = $location->geometry;
-        if (!$geometry) {
+        if (! $geometry) {
             $geometry = [
                 'type' => 'Point',
                 'coordinates' => [
@@ -109,7 +112,7 @@ class GeoJsonController extends Controller
                 'photo_url' => $location->photo_url,
                 'latitude' => (float) $location->latitude,
                 'longitude' => (float) $location->longitude,
-                'is_wilayah' => !$isPlaceType,
+                'is_wilayah' => ! $isPlaceType,
                 'wilayah' => $location->wilayah?->name,
                 'provinsi' => $location->wilayah?->category?->name,
                 'created_at' => $location->created_at->toIso8601String(),

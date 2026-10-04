@@ -14,6 +14,9 @@ class FavoriteController extends Controller
     {
         $favorites = Favorite::with('location.category')
             ->where('user_id', $request->user()->id)
+            // Lokasi yang fotonya belum disetujui tidak tampil di daftar
+            // favorit supaya tidak membocorkan nama yang seharusnya disembunyikan.
+            ->whereHas('location', fn ($q) => $q->publiclyVisible())
             ->orderByDesc('created_at')
             ->paginate(12);
 

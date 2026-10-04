@@ -146,38 +146,40 @@ class PhotoReviewPageTest extends TestCase
         $this->assertNotNull($loc->fresh()->photo_url);
     }
 
-    public function test_pending_location_is_listed_publicly_but_its_name_is_hidden(): void
+    public function test_pending_location_is_hidden_entirely_from_the_public_list(): void
     {
-        $loc = $this->photoLocation('Candi Prambanan');
+        $this->photoLocation('Candi Prambanan');
 
-        // Aturan: menunggu = foto disembunyikan DAN nama tempat disembunyikan
-        // di daftar publik (kotak abu-abu + kategori saja). Lokasi tetap
-        // ada di peta lewat koordinat/marker-nya.
+        // Aturan: menunggu = disembunyikan total. Tidak ada nama, tidak ada
+        // kotak abu-abu, tidak ada apa pun di daftar publik.
         $response = $this->get(route('map.index'));
 
         $response->assertOk();
         $response->assertDontSee('Candi Prambanan');
-        $response->assertDontSee($loc->photo);
-        $response->assertSee('Wisata Alam');
-        $response->assertSee('Foto sedang diverifikasi.');
+        $response->assertDontSee('Foto sedang diverifikasi.');
     }
 
     public function test_pending_location_keeps_its_map_marker_but_has_no_photo_in_geojson(): void
     {
-        $loc = $this->photoLocation('Candi Prambanan');
+        $this->photoLocation('Candi Prambanan');
 
+        // Menunggu = disembunyikan total dari peta: tidak ada marker, tidak
+        // ada koordinat, tidak ada nama yang bocor lewat API.
         $response = $this->getJson(route('geojson.index', ['compact' => 1]));
 
         $response->assertOk();
-
-        $feature = collect($response->json('features'))->firstWhere('id', $loc->id);
-
-        $this->assertNotNull($feature, 'Lokasi menunggu harus tetap punya marker di peta.');
-        $this->assertSame('Candi Prambanan', $feature['properties']['name']);
-        $this->assertNull($feature['properties']['photo_url']);
+        $this->assertCount(0, $response->json('features'));
     }
 
-    public function test_approved_location_shows_both_name_and_photo_publicly(): void
+    public function test_pending_location_detail_page_returns_404(): void
+    {
+        $loc = $this->photoLocation('Candi Prambanan');
+
+        $this->get(route('map.show', $loc))->assertNotFound();
+        $this->getJson(route('geojson.show', $loc))->assertNotFound();
+    }
+
+    public function test_approved_location_is_visible_with_marker_photo_and_detail_page(): void
     {
         $loc = $this->photoLocation('Pantai Kuta', Location::PHOTO_APPROVED);
 
@@ -185,6 +187,14 @@ class PhotoReviewPageTest extends TestCase
             ->assertOk()
             ->assertSee('Pantai Kuta')
             ->assertSee($loc->photo);
+
+        $this->get(route('map.show', $loc))->assertOk()->assertSee('Pantai Kuta');
+
+        $feature = collect($this->getJson(route('geojson.index', ['compact' => 1]))->json('features'))
+            ->firstWhere('id', $loc->id);
+
+        $this->assertNotNull($feature);
+        $this->assertNotNull($feature['properties']['photo_url']);
     }
 
     public function test_approve_without_selection_is_rejected(): void
