@@ -137,6 +137,7 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
     Route::get('locations/template', [LocationController::class, 'template'])->name('locations.template');
     Route::post('locations/sync', [LocationController::class, 'sync'])->name('locations.sync');
 
+    Route::get('categories/provinsi', [CategoryController::class, 'provinces'])->name('categories.provinsi');
     Route::resource('categories', CategoryController::class)->except(['show']);
 
     Route::resource('users', App\Http\Controllers\Admin\UserController::class)->except(['show']);

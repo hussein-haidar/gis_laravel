@@ -43,16 +43,16 @@ class LocationController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::places()->ordered()->get();
 
         // Dashboard stats
         $stats = [
             'total_locations' => Location::count(),
-            'total_categories' => Category::count(),
+            'total_categories' => Category::places()->count(),
             'locations_with_photos' => Location::whereNotNull('photo')->where('photo', '!=', '')->count(),
             'locations_with_geometry' => Location::whereNotNull('geometry')->count(),
             'recent_locations' => Location::latest()->take(5)->get(),
-            'locations_per_category' => Category::withCount('locations')
+            'locations_per_category' => Category::places()->withCount('locations')
                 ->orderByDesc('locations_count')
                 ->get(),
             'total_navigation_history' => NavigationHistory::count(),
@@ -64,7 +64,7 @@ class LocationController extends Controller
 
     public function create(): View
     {
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::places()->ordered()->get();
 
         return view('admin-loc.create', compact('categories'));
     }
@@ -103,7 +103,14 @@ class LocationController extends Controller
 
     public function edit(Location $location): View
     {
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::places()->ordered()->get();
+
+        // Lokasi wilayah/provinsi memakai kategori provinsi. Tetap tampilkan
+        // kategori miliknya sendiri supaya tidak hilang saat form disimpan.
+        if ($location->category_id && ! $categories->contains('id', $location->category_id)) {
+            $categories = $categories->push($location->category)->sortBy('name')->values();
+        }
+
         $location->load('photos');
 
         return view('admin-loc.edit', compact('location', 'categories'));

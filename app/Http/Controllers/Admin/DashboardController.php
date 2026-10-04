@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\Location;
+use App\Models\LocationPhoto;
 use App\Models\NavigationHistory;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -23,8 +24,8 @@ class DashboardController extends Controller
         $stats = [
             'locations' => Location::count(),
             'with_geometry' => Location::whereNotNull('geometry')->count(),
-            'categories' => Category::count(),
-            'photos' => \App\Models\LocationPhoto::count(),
+            'categories' => Category::places()->count(),
+            'photos' => LocationPhoto::count(),
             'navigations' => NavigationHistory::count(),
             'total_distance' => $totalDistance,
             'users' => User::count(),
@@ -32,7 +33,7 @@ class DashboardController extends Controller
         ];
 
         // Locations per category
-        $locationByCategory = Category::withCount('locations')
+        $locationByCategory = Category::places()->withCount('locations')
             ->orderByDesc('locations_count')
             ->get()
             ->map(fn ($cat) => (object) [
@@ -110,7 +111,7 @@ class DashboardController extends Controller
             ->get();
 
         // Top categories by navigation
-        $topNavCategories = Category::select(
+        $topNavCategories = Category::places()->select(
             'categories.name',
             'categories.color',
             DB::raw('count(distinct navigation_histories.id) as nav_count')
@@ -143,6 +144,7 @@ class DashboardController extends Controller
         $h = intdiv($seconds, 3600);
         $m = intdiv($seconds % 3600, 60);
         $s = $seconds % 60;
-        return ($h ? "{$h} jam " : '') . ($m ? "{$m} mnt " : '') . "{$s} dtk";
+
+        return ($h ? "{$h} jam " : '').($m ? "{$m} mnt " : '')."{$s} dtk";
     }
 }

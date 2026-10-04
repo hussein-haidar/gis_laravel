@@ -18,8 +18,13 @@ class CategoryController extends Controller
 
     public function show(Category $category): JsonResponse
     {
-        $category->loadCount('locations');
-        $category->load('locations');
+        // Hanya lokasi yang fotonya sudah disetujui yang boleh muncul di API
+        // publik, sama seperti peta, daftar, dan pencarian navigasi.
+        $category->loadCount(['locations as locations_count' => fn ($query) => $query->publiclyVisible()]);
+        $category->setRelation(
+            'locations',
+            $category->locations()->publiclyVisible()->with('category')->get()
+        );
 
         return response()->json(['data' => $category]);
     }
@@ -62,7 +67,7 @@ class CategoryController extends Controller
     private function validated(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:categories,name' . ($ignoreId ? ",{$ignoreId}" : '')],
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name'.($ignoreId ? ",{$ignoreId}" : '')],
             'color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);

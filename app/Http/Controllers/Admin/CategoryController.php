@@ -11,29 +11,53 @@ use Illuminate\View\View;
 
 class CategoryController extends Controller
 {
+    /**
+     * Daftar kategori jenis tempat. Kategori wilayah/provinsi hasil sinkron
+     * GIS sengaja dipisah ke tab sendiri agar tidak membingungkan.
+     */
     public function index(Request $request): View
     {
         $search = trim($request->query('search', ''));
 
         $categories = Category::query()
+            ->places()
             ->withCount('locations')
             ->with('parent')
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
-                });
-            })
+            ->search($search)
             ->ordered()
             ->paginate(10)
             ->withQueryString();
 
-        return view('admin-cat.index', compact('categories', 'search'));
+        $provinceCount = Category::provinces()->count();
+
+        return view('admin-cat.index', compact('categories', 'search', 'provinceCount'));
+    }
+
+    /**
+     * Kategori wilayah/provinsi. Baris ini dibuat oleh sinkronisasi GIS,
+     * bukan input manual, jadi tidak ada tombol tambah di halaman ini.
+     */
+    public function provinces(Request $request): View
+    {
+        $search = trim($request->query('search', ''));
+
+        $categories = Category::query()
+            ->provinces()
+            ->withCount('locations')
+            ->search($search)
+            ->ordered()
+            ->paginate(15)
+            ->withQueryString();
+
+        $provinceCount = Category::provinces()->count();
+
+        return view('admin-cat.provinsi', compact('categories', 'search', 'provinceCount'));
     }
 
     public function create(): View
     {
-        $parents = Category::root()->ordered()->get();
+        $parents = Category::root()->places()->ordered()->get();
+
         return view('admin-cat.create', compact('parents'));
     }
 
@@ -52,7 +76,8 @@ class CategoryController extends Controller
 
     public function edit(Category $category): View
     {
-        $parents = Category::root()->where('id', '!=', $category->id)->ordered()->get();
+        $parents = Category::root()->places()->where('id', '!=', $category->id)->ordered()->get();
+
         return view('admin-cat.edit', compact('category', 'parents'));
     }
 
@@ -92,7 +117,7 @@ class CategoryController extends Controller
     private function validated(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:categories,name' . ($ignoreId ? ",{$ignoreId}" : '')],
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name'.($ignoreId ? ",{$ignoreId}" : '')],
             'color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'description' => ['nullable', 'string', 'max:1000'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
@@ -112,9 +137,9 @@ class CategoryController extends Controller
             'old_values' => $oldValues,
             'new_values' => $newValues,
             'description' => match ($type) {
-                'category_created' => 'Menambahkan kategori: ' . ($subject?->name ?? ''),
-                'category_updated' => 'Memperbarui kategori: ' . ($subject?->name ?? $oldValues['name'] ?? ''),
-                'category_deleted' => 'Menghapus kategori: ' . ($oldValues['name'] ?? ''),
+                'category_created' => 'Menambahkan kategori: '.($subject?->name ?? ''),
+                'category_updated' => 'Memperbarui kategori: '.($subject?->name ?? $oldValues['name'] ?? ''),
+                'category_deleted' => 'Menghapus kategori: '.($oldValues['name'] ?? ''),
                 default => 'Aksi pada kategori',
             },
             'ip_address' => request()->ip(),

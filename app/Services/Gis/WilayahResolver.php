@@ -2,7 +2,6 @@
 
 namespace App\Services\Gis;
 
-use App\Models\Category;
 use App\Models\Location;
 use Illuminate\Support\Collection;
 
@@ -218,14 +217,12 @@ class WilayahResolver
         static $regions = null;
 
         if ($regions === null) {
-            $names = Category::PLACE_TYPES;
-
             $regions = Location::query()
                 ->with('category')
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
                 ->whereNotNull('geometry')
-                ->whereHas('category', fn ($q) => $q->whereNotIn('name', $names))
+                ->whereHas('category', fn ($q) => $q->provinces())
                 ->get()
                 ->map(fn (Location $loc) => [
                     'id' => $loc->id,

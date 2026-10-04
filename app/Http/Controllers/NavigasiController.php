@@ -17,7 +17,7 @@ class NavigasiController extends Controller
 
     public function index(): View
     {
-        $categories = Category::active()->ordered()->get();
+        $categories = Category::active()->forPublicFilter()->ordered()->get();
 
         return view('navigasi.index', compact('categories'));
     }

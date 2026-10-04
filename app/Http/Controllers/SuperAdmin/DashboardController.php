@@ -7,7 +7,6 @@ use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -16,13 +15,13 @@ class DashboardController extends Controller
     {
         $stats = [
             'total_locations' => Location::count(),
-            'total_categories' => Category::count(),
+            'total_categories' => Category::places()->count(),
             'total_users' => User::count(),
             'locations_with_photo' => Location::whereNotNull('photo')->count(),
             'locations_without_photo' => Location::whereNull('photo')->count(),
         ];
 
-        $locationsByCategory = Category::withCount('locations')
+        $locationsByCategory = Category::places()->withCount('locations')
             ->with('locations')
             ->orderBy('name')
             ->get()
