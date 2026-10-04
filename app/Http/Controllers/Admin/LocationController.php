@@ -270,8 +270,8 @@ class LocationController extends Controller
     {
         return view('admin-loc.radius', [
             'locations' => collect(),
-            'lat' => -2.5489,
-            'lng' => 118.0149,
+            'lat' => -6.2088,
+            'lng' => 106.8456,
             'radius' => 100,
         ]);
     }
