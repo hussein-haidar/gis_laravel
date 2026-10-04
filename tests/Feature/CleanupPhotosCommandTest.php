@@ -165,4 +165,49 @@ class CleanupPhotosCommandTest extends TestCase
         $this->assertTrue($validator->isHardFailure('text_on_white'));
         $this->assertFalse($validator->isSoftFailure('solid_color'));
     }
+
+    /**
+     * Baris wilayah/provinsi adalah dimensi referensi yang ditunjuk 1.644
+     * lokasi lewat wilayah_id, jadi tidak boleh ikut terhapus hanya karena
+     * fotanya kosong.
+     */
+    public function test_delete_empty_keeps_wilayah_rows_by_default(): void
+    {
+        $provinsi = Category::create(['name' => 'JAWA TENGAH']);
+
+        $wilayah = Location::create([
+            'name' => 'JEPARA',
+            'category_id' => $provinsi->id,
+            'latitude' => -5.9,
+            'longitude' => 110.4,
+        ]);
+
+        $tempat = Location::create([
+            'name' => 'Tempat Tanpa Foto',
+            'category_id' => $this->tempat->id,
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+        ]);
+
+        Artisan::call('photos:cleanup', ['--delete-empty' => true]);
+
+        $this->assertDatabaseHas('locations', ['id' => $wilayah->id]);
+        $this->assertDatabaseMissing('locations', ['id' => $tempat->id]);
+    }
+
+    public function test_include_non_place_also_deletes_wilayah_rows(): void
+    {
+        $provinsi = Category::create(['name' => 'JAWA TENGAH']);
+
+        $wilayah = Location::create([
+            'name' => 'JEPARA',
+            'category_id' => $provinsi->id,
+            'latitude' => -5.9,
+            'longitude' => 110.4,
+        ]);
+
+        Artisan::call('photos:cleanup', ['--delete-empty' => true, '--include-non-place' => true]);
+
+        $this->assertDatabaseMissing('locations', ['id' => $wilayah->id]);
+    }
 }

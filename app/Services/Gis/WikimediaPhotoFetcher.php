@@ -37,6 +37,48 @@ class WikimediaPhotoFetcher
         'logo', 'lambang', 'coat of arms', 'seal of', 'flag of', 'bendera',
         'chart', 'grafik', 'graph', 'poster', 'plakat', 'plaque', 'signboard',
         'screenshot', 'cover', 'collage', 'montage', 'panorama',
+        // Dokumen kegiatan, bukan foto tempatnya.
+        'wikipedia', 'wikimedia', 'wikilatih', 'seminar', 'workshop', 'rapat',
+        'kunjungan', 'grand opening', 'skenario',
+    ];
+
+    /**
+     * Rasio kata bermakna nama lokasi yang harus ada di judul sumber foto.
+     *
+     * Tanpa ambang ini, pencarian dengan nama yang dipotong ("Museum
+     * Sasmitaloka Jenderal Besar DR. A.H. Nasution" -> "Museum Sasmitaloka")
+     * ikut melewati foto "Museum Sasmitaloka Panglima Besar Jenderal
+     * Soedirman": museum yang berbeda, karena hanya satu kata yang cocok.
+     * 0,6 artinya judul sumber harus menyebut sebagian besar nama lokasi.
+     */
+    protected const MIN_TITLE_MATCH_RATIO = 0.6;
+
+    /**
+     * Kata umum pada nama lokasi yang tidak bisa membedakan tempat.
+     *
+     * @var array<int, string>
+     */
+    protected const STOP_WORDS = [
+        'indonesia', 'indonesian', 'the', 'of', 'dan', 'di', 'ke', 'dari', 'at', 'in',
+        'kota', 'kabupaten', 'kecamatan', 'desa',
+    ];
+
+    /**
+     * Kata umum jenis tempat, bukan penanda lokasi tertentu.
+     *
+     * Kata-kata ini sering muncul di banyak nama lokasi sehingga cocoknya
+     * tidak berarti gambar itu milik tempat yang dimaksud: "Kebun Binatang
+     * Ragunan" tidak boleh dilayani foto "Kebun Binatang Jurug" hanya karena
+     * kata "kebun" dan "binatang" sama. Kata khas ("ragunan") wajib ada.
+     *
+     * @var array<int, string>
+     */
+    protected const GENERIC_WORDS = [
+        'museum', 'kebun', 'binatang', 'zoo', 'taman', 'pantai', 'danau', 'sungai',
+        'gunung', 'air', 'terjun', 'candi', 'temple', 'pura', 'masjid', 'gereja',
+        'katedral', 'kelenteng', 'temple', 'hotel', 'restoran', 'cafe', 'warung',
+        'sekolah', 'universitas', 'kampus', 'stasiun', 'bandar', 'udara', 'terminal',
+        'pelabuhan', 'pasar', 'mall', 'tower', 'gedung', 'rumah', 'villa', 'bebas',
     ];
 
     public function __construct(
@@ -119,16 +161,21 @@ class WikimediaPhotoFetcher
             ? $locations->filter(fn ($loc) => $loc instanceof Location)
             : Location::query()->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES));
 
+        $disk = Storage::disk('public');
+
         return $query
             ->get()
-            ->filter(function (Location $loc) {
+            ->filter(function (Location $loc) use ($disk) {
                 $photo = $loc->photo;
 
                 if (empty($photo)) {
                     return true;
                 }
 
-                return ! file_exists(storage_path('app/public/'.$photo));
+                // Cek lewat disk, bukan file_exists: rottenya nama folder
+                // disk "public" adalah urusan konfigurasi, bukan path
+                // yang ditulis manual di sini.
+                return ! $disk->exists($photo);
             })
             ->sortBy('id')
             ->values();
@@ -206,7 +253,13 @@ class WikimediaPhotoFetcher
                 continue;
             }
 
-            $loc->update(['photo' => $filename]);
+            $loc->update([
+                'photo' => $filename,
+                'photo_source_title' => $candidate['title'] ?: null,
+                'photo_source_url' => $url,
+                'photo_source_provider' => $candidate['source'],
+                'photo_fetched_at' => now(),
+            ]);
             $this->rememberOwnHash($loc, $body);
 
             // Hapus versi lama supaya tidak tertinggal sebagai file yatim.
@@ -241,10 +294,14 @@ class WikimediaPhotoFetcher
             foreach (Location::query()
                 ->whereNotNull('photo')
                 ->get(['id', 'photo']) as $other) {
-                $path = storage_path('app/public/'.$other->photo);
+                if (! Storage::disk('public')->exists($other->photo)) {
+                    continue;
+                }
 
-                if (is_file($path)) {
-                    $this->usedHashes[md5_file($path)] = $other->id;
+                $hash = md5(Storage::disk('public')->get($other->photo));
+
+                if ($hash !== false && $hash !== '') {
+                    $this->usedHashes[$hash] = $other->id;
                 }
             }
         }
@@ -342,10 +399,11 @@ class WikimediaPhotoFetcher
 
         $score = $this->relevanceScore($candidate['title'], $query);
 
-        // Tidak ada satupun kata kunci nama lokasi yang muncul di judul:
-        // kemungkinan besar hasil pencarian ini milik tempat lain.
-        if ($score <= 0) {
-            Log::debug('Candidate skipped (no keyword match): '.$candidate['title']);
+        // Kandidat harus menyebut sebagian besar nama lokasi. Tanpa ini,
+        // pencarian dengan nama yang dipotong dapat mengambil foto milik
+        // tempat lain yang kebetulan berbagi satu kata.
+        if (! $this->titleMatchesLocation($candidate['title'], $query)) {
+            Log::debug('Candidate skipped (title does not match location): '.$candidate['title']);
 
             return;
         }
@@ -381,22 +439,76 @@ class WikimediaPhotoFetcher
     protected function relevanceScore(string $title, string $query): int
     {
         $title = mb_strtolower($title);
-        $needles = array_filter(preg_split('/\s+/', mb_strtolower($query)) ?: []);
-
-        // Kata yang tidak spesifik: abaikan agar tidak menaikkan skor.
-        $stopWords = ['indonesia', 'indonesian', 'the', 'of', 'dan', 'di', 'ke', 'dari', 'at', 'in'];
-
         $score = 0;
-        foreach ($needles as $needle) {
-            if (in_array($needle, $stopWords, true)) {
-                continue;
-            }
+
+        foreach ($this->needles($query) as $needle) {
             if (mb_strpos($title, $needle) !== false) {
                 $score++;
             }
         }
 
         return $score;
+    }
+
+    /**
+     * True bila judul sumber foto benar-benar menyebut nama lokasi.
+     *
+     * Hanya bagian tertentu dari nama yang perlu cocok (lihat
+     * MIN_TITLE_MATCH_RATIO): judul "Prambanan Temple" tetap ditolak untuk
+     * "Candi Prambanan" karena kata "candi" tidak ada, sedangkan judul
+     * berprefik panjang seperti "Museum Kereta Api Ambarawa" tetap diterima
+     * untuk nama yang memuat banyak kata tambahan.
+     */
+    public function titleMatchesLocation(string $title, string $locationName): bool
+    {
+        $lowerTitle = mb_strtolower($title);
+
+        // Semua kata khas lokasi harus ada. Ini yang menolak foto
+        // "Kebun Binatang Jurug" untuk lokasi "Kebun Binatang Ragunan".
+        foreach ($this->distinctiveWords($locationName) as $word) {
+            if (! str_contains($lowerTitle, $word)) {
+                return false;
+            }
+        }
+
+        // Dan judul harus tetap menyebut sebagian besar nama keseluruhan.
+        return $this->titleMatchRatio($title, $locationName) >= self::MIN_TITLE_MATCH_RATIO;
+    }
+
+    /** 0.0 - 1.0: berapa bagian nama lokasi yang disebut judul sumber. */
+    public function titleMatchRatio(string $title, string $locationName): float
+    {
+        $needles = $this->needles($locationName);
+
+        if ($needles === []) {
+            return 0.0;
+        }
+
+        return $this->relevanceScore($title, $locationName) / count($needles);
+    }
+
+    /**
+     * Kata penanda lokasi tertentu, yaitu kata yang bukan kata umum
+     * maupun kata jenis tempat.
+     *
+     * @return array<int, string>
+     */
+    public function distinctiveWords(string $locationName): array
+    {
+        return array_values(array_filter(
+            $this->needles($locationName),
+            fn (string $word) => ! in_array($word, self::GENERIC_WORDS, true)
+        ));
+    }
+
+    /** @return array<int, string> */
+    protected function needles(string $query): array
+    {
+        $words = preg_split('/\s+/', mb_strtolower($query)) ?: [];
+
+        // Kata umum diabaikan: hampir semua judul memuatnya sehingga tidak
+        // bisa membedakan lokasi.
+        return array_values(array_filter($words, fn ($w) => $w !== '' && ! in_array($w, self::STOP_WORDS, true)));
     }
 
     /**

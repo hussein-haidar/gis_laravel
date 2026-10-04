@@ -32,6 +32,7 @@ class CleanupPhotos extends Command
                             {--duplicates : Hanya lepas foto duplikat lintas lokasi}
                             {--missing : Hanya null-kan path foto yang hilang}
                             {--delete-empty : Hapus record lokasi yang fotonya kosong}
+                            {--include-non-place : Sertakan kategori wilayah/provinsi saat --delete-empty}
                             {--quarantine= : Pindahkan berkas ke folder ini alih-alih menghapus}
                             {--limit=0 : Batasi jumlah berkas yang diproses per kategori}';
 
@@ -128,6 +129,16 @@ class CleanupPhotos extends Command
             ->with('category')
             ->get(['id', 'name', 'photo', 'category_id'])
             ->filter(fn (Location $loc) => empty($loc->photo) || ! $disk->exists($loc->photo))
+            ->values();
+
+        // Baris wilayah/provinsi adalah dimensi referensi: 1.644 lokasi
+        // menunjuk mereka lewat wilayah_id. Menghapusnya hanya karena tidak
+        // ada foto akan membongkar peta wilayah, jadi defaultnya dikecualikan.
+        $includeNonPlace = (bool) $this->option('include-non-place');
+
+        $empty = $empty
+            ->filter(fn (Location $loc) => $includeNonPlace
+                || in_array($loc->category?->name, Category::PLACE_TYPES, true))
             ->values();
 
         if ($empty->isEmpty()) {

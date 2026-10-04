@@ -17,6 +17,10 @@ class Location extends Model
         'category_id',
         'wilayah_id',
         'photo',
+        'photo_source_title',
+        'photo_source_url',
+        'photo_source_provider',
+        'photo_fetched_at',
         'geometry',
     ];
 
