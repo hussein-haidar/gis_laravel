@@ -47,9 +47,29 @@
             font-size: 13px; line-height: 1.7;
             margin-bottom: 8px;
             max-width: 270px;
-            max-height: 62vh;
+            /* Dibatasi supaya tidak pernah sampai ke tombol zoom in/out di
+               pojok kiri atas peta dan menutupnya. */
+            max-height: min(42vh, 300px);
             overflow-y: auto;
         }
+        .map-legend-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; position: sticky; top: -8px;
+            background: #fff; padding-bottom: 4px;
+        }
+        .map-legend-close {
+            border: 0; background: #e5e7eb; color: #111827;
+            width: 22px; height: 22px; line-height: 1; padding: 0;
+            border-radius: 5px; cursor: pointer; font-size: 15px; flex: 0 0 auto;
+        }
+        .map-legend-close:hover { background: #d1d5db; }
+        .map-legend-open {
+            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
+            background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
+            padding: 4px 10px; font-size: 12px; cursor: pointer;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4); display: none;
+        }
+        .map-legend-open.show { display: block; }
         .map-legend i {
             width: 12px; height: 12px;
             display: inline-block; margin-right: 6px; border-radius: 50%;
@@ -174,6 +194,8 @@
             <button class="btn btn-sm btn-light" id="btn-print-map" title="{{ __('messages.toolbar_print') }}">🖨️ {{ __('messages.toolbar_print') }}</button>
             <button class="btn btn-sm btn-light" id="btn-export-png" title="{{ __('messages.toolbar_export_png') }}">📸 {{ __('messages.toolbar_export_png') }}</button>
         </div>
+
+        <button type="button" id="legend-open-btn" class="map-legend-open">📋 Legenda</button>
 
         <div class="routing-panel" id="routing-panel">
             <h6 class="mb-2">{{ __('messages.toolbar_route') }}</h6>
@@ -714,10 +736,17 @@
                 legendRows.push(`<i style="background:${c}"></i> ${p.category || ''}`);
             });
 
+            // Box legend tidak muncul otomatis: dia ditumpuk di pojok kiri
+            // bawah peta dan bisa menutupi tombol zoom in/out. Pengguna
+            // membuka sendiri lewat tombol kecil "Legenda".
+            const openBtn = document.getElementById('legend-open-btn');
+            if (openBtn) openBtn.classList.add('show');
+
             const legend = L.control({ position: 'bottomleft' });
             legend.onAdd = function () {
                 const div = L.DomUtil.create('div', 'map-legend');
-                div.innerHTML = '<strong>Lokasi</strong><br>'
+                div.innerHTML = '<div class="map-legend-head"><strong>Lokasi</strong>'
+                    + '<button type="button" class="map-legend-close" title="Tutup legenda" aria-label="Tutup legenda">&times;</button></div>'
                     + '<span class="cluster-sample"></span> Cluster (warna = kategori dominan, angka = jumlah lokasi, klik untuk zoom)<br>'
                     + legendRows.join('<br>')
                     + '<br><strong>Wilayah</strong><br>'
@@ -726,9 +755,33 @@
                     + congestionLegend.map(function (x) {
                         return '<i class="road" style="background:' + x[0] + '"></i> ' + x[1];
                     }).join('<br>');
+
+                div.querySelector('.map-legend-close').addEventListener('click', function () {
+                    legend.remove();
+                    openBtn.classList.add('show');
+                    try { localStorage.setItem('mapLegendOpen', '0'); } catch (e) {}
+                });
+
                 return div;
             };
             legend.addTo(map);
+
+            // Tombol pemicu tampilnya legend.
+            if (openBtn) {
+                openBtn.addEventListener('click', function () {
+                    legend.addTo(map);
+                    openBtn.classList.remove('show');
+                    try { localStorage.setItem('mapLegendOpen', '1'); } catch (e) {}
+                });
+            }
+
+            // Kalau user pernah membuka legend, tampilkan lagi.
+            let remembered = null;
+            try { remembered = localStorage.getItem('mapLegendOpen'); } catch (e) {}
+            if (remembered === '1') {
+                legend.remove();
+                openBtn.classList.add('show');
+            }
         }
 
         // Panggil render lokasi via API async. Kalau gagal (mis. memory/network),
