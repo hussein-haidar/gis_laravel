@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\RefillLocationPhotos;
 use App\Models\Category;
 use App\Models\Location;
 use App\Services\Gis\PhotoQualityValidator;
@@ -114,6 +115,76 @@ class CleanupPhotosCommandTest extends TestCase
         Artisan::call('photos:cleanup', ['--delete-empty' => true]);
 
         $this->assertDatabaseMissing('locations', ['id' => $loc->id]);
+    }
+
+    public function test_delete_empty_is_skipped_while_a_refill_is_running(): void
+    {
+        $tanpaFoto = Location::create([
+            'name' => 'Belum Dicoba',
+            'category_id' => $this->tempat->id,
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+        ]);
+
+        // Simulasikan proses refill yang masih berjalan (PID = proses test).
+        $lock = storage_path('app/photos-refill.lock');
+        @mkdir(dirname($lock), 0777, true);
+        file_put_contents($lock, (string) getmypid());
+
+        try {
+            Artisan::call('photos:cleanup', ['--delete-empty' => true]);
+        } finally {
+            @unlink($lock);
+        }
+
+        $this->assertDatabaseHas('locations', ['id' => $tanpaFoto->id]);
+        $this->assertStringContainsString(
+            'sedang berjalan',
+            Artisan::output()
+        );
+    }
+
+    public function test_a_stale_refill_lock_does_not_block_delete_empty(): void
+    {
+        $tanpaFoto = Location::create([
+            'name' => 'Tanpa Foto',
+            'category_id' => $this->tempat->id,
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+        ]);
+
+        // PID yang tidak mungkin hidup lagi.
+        $lock = storage_path('app/photos-refill.lock');
+        @mkdir(dirname($lock), 0777, true);
+        file_put_contents($lock, '4194303');
+
+        $this->assertFalse(RefillLocationPhotos::isRunning());
+
+        Artisan::call('photos:cleanup', ['--delete-empty' => true]);
+
+        $this->assertDatabaseMissing('locations', ['id' => $tanpaFoto->id]);
+    }
+
+    public function test_force_option_ignores_the_refill_lock(): void
+    {
+        $tanpaFoto = Location::create([
+            'name' => 'Dipaksa Hapus',
+            'category_id' => $this->tempat->id,
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+        ]);
+
+        $lock = storage_path('app/photos-refill.lock');
+        @mkdir(dirname($lock), 0777, true);
+        file_put_contents($lock, (string) getmypid());
+
+        try {
+            Artisan::call('photos:cleanup', ['--delete-empty' => true, '--force' => true]);
+        } finally {
+            @unlink($lock);
+        }
+
+        $this->assertDatabaseMissing('locations', ['id' => $tanpaFoto->id]);
     }
 
     public function test_dry_run_keeps_everything_untouched(): void

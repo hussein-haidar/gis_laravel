@@ -32,6 +32,7 @@ class CleanupPhotos extends Command
                             {--duplicates : Hanya lepas foto duplikat lintas lokasi}
                             {--missing : Hanya null-kan path foto yang hilang}
                             {--delete-empty : Hapus record lokasi yang fotonya kosong}
+                            {--force : Abaikan pengaman "refill sedang berjalan"}
                             {--include-non-place : Sertakan kategori wilayah/provinsi saat --delete-empty}
                             {--quarantine= : Pindahkan berkas ke folder ini alih-alih menghapus}
                             {--limit=0 : Batasi jumlah berkas yang diproses per kategori}';
@@ -97,7 +98,13 @@ class CleanupPhotos extends Command
         }
 
         if ($this->option('delete-empty')) {
-            $this->handleDeleteEmpty($disk, $dryRun, $stats);
+            if (! $this->option('force') && RefillLocationPhotos::isRunning()) {
+                // Refill masih berjalan: lokasi yang belum sempat dicoba akan
+                // ikut terhapus kalau cleanup dijadwalkan. Lewati hapus lokasi.
+                $this->warn('Peringatan: photos:refill-all sedang berjalan — hapus lokasi tanpa foto DILEWATI.');
+            } else {
+                $this->handleDeleteEmpty($disk, $dryRun, $stats);
+            }
         }
 
         $this->newLine();

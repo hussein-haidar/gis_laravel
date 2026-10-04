@@ -35,6 +35,71 @@ class RefillLocationPhotos extends Command
         $sleep = max(0, (int) $this->option('sleep'));
         $limit = (int) $this->option('limit');
 
+        // Kunci supaya photos:cleanup terjadwal tidak menghapus lokasi yang
+        // belum sempat dicoba selama proses refill masih berjalan.
+        $lock = self::lockPath();
+        @mkdir(dirname($lock), 0777, true);
+        file_put_contents($lock, (string) getmypid());
+
+        try {
+            return $this->runRounds($fetcher, $rounds, $sleep, $limit);
+        } finally {
+            @unlink($lock);
+        }
+    }
+
+    /**
+     * Apakah ada proses refill yang sedang berjalan?
+     *
+     * Dipakai CleanupPhotos supaya hapus lokasi tanpa foto tidak jalan di
+     * tengah refill (cleanup terjadwal bisa mengenai proses yang masih jalan).
+     */
+    public static function isRunning(): bool
+    {
+        $lock = self::lockPath();
+
+        if (! is_file($lock)) {
+            return false;
+        }
+
+        $pid = (int) @file_get_contents($lock);
+
+        if ($pid <= 0) {
+            @unlink($lock);
+
+            return false;
+        }
+
+        if (static::processExists($pid)) {
+            return true;
+        }
+
+        // Kunci sisa dari proses yang sudah mati / belum pernah ada.
+        @unlink($lock);
+
+        return false;
+    }
+
+    protected static function lockPath(): string
+    {
+        return storage_path('app/photos-refill.lock');
+    }
+
+    private static function processExists(int $pid): bool
+    {
+        if (function_exists('posix_kill')) {
+            return @posix_kill($pid, 0);
+        }
+
+        // Windows: tasklist tidak punya posix_kill.
+        exec('tasklist /FI "PID eq '.$pid.'" /NH 2>nul', $out, $code);
+
+        return $code === 0 && count(preg_grep('/\s'.$pid.'\s/', $out)) > 0;
+    }
+
+    private function runRounds(WikimediaPhotoFetcher $fetcher, int $rounds, int $sleep, int $limit): int
+    {
+
         for ($round = 1; $round <= $rounds; $round++) {
             $this->info("=== Putaran {$round}/{$rounds} ===");
 
@@ -63,7 +128,9 @@ class RefillLocationPhotos extends Command
             $complete = $limit <= 0 || $missing <= $limit;
 
             if ($complete) {
-                $this->call('photos:cleanup', ['--delete-empty' => true]);
+                // --force: proses refill-lah yang memanggil, jadi pengaman
+                // "refill sedang berjalan" tidak perlu di sini.
+                $this->call('photos:cleanup', ['--delete-empty' => true, '--force' => true]);
                 $this->line('  Lokasi tanpa foto tersisa: '.$this->emptyPhotoCount());
             } else {
                 $this->line("  --limit {$limit}: lewati hapus lokasi (masih ada {$missing} tanpa foto).");
