@@ -45,7 +45,7 @@
             background: #fff; padding: 8px 12px;
             border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
             font-size: 13px; line-height: 1.7;
-            margin-bottom: 8px;
+            margin-bottom: 24px;
             max-width: 270px;
             /* Dibatasi supaya tidak pernah sampai ke tombol zoom in/out di
                pojok kiri atas peta dan menutupnya. */
@@ -64,7 +64,7 @@
         }
         .map-legend-close:hover { background: #d1d5db; }
         .map-legend-open {
-            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
+            position: absolute; bottom: 30px; right: 10px; z-index: 1000;
             background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
             padding: 4px 10px; font-size: 12px; cursor: pointer;
             box-shadow: 0 1px 5px rgba(0,0,0,0.4); display: none;
@@ -751,8 +751,9 @@
             const openBtn = document.getElementById('legend-open-btn');
             if (openBtn) openBtn.classList.add('show');
 
-            // Selalu pojok KIRI bawah peta (bukan kanan), sesuai permintaan.
-            const legend = L.control({ position: 'bottomleft' });
+            // Selalu pojok KANAN bawah peta, supaya tidak bertabrakan dengan tombol
+            // zoom in / zoom out yang ada di pojok kiri.
+            const legend = L.control({ position: 'bottomright' });
             legend.onAdd = function () {
                 const div = L.DomUtil.create('div', 'map-legend');
                 div.innerHTML = '<div class="map-legend-head"><strong>Lokasi</strong>'
@@ -775,13 +776,13 @@
                 return div;
             };
 legend.addTo(map);
-                legend.setPosition('bottomleft');
+                legend.setPosition('bottomright');
 
             // Tombol pemicu tampilnya legend.
             if (openBtn) {
                 openBtn.addEventListener('click', function () {
 legend.addTo(map);
-            legend.setPosition('bottomleft');
+            legend.setPosition('bottomright');
                     openBtn.classList.remove('show');
                     try { localStorage.setItem('mapLegendOpen', '1'); } catch (e) {}
                 });
