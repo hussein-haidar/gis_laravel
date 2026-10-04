@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Models\Category;
 use App\Models\Location;
+use Illuminate\Support\Collection;
 
 class PetaContextService
 {
@@ -32,6 +33,7 @@ class PetaContextService
     public function datasetSummary(): string
     {
         $perKategori = Location::query()
+            ->publiclyVisible()
             ->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES))
             ->selectRaw('category_id, COUNT(*) AS jml')
             ->groupBy('category_id')
@@ -41,12 +43,12 @@ class PetaContextService
 
         $baris = [];
         foreach ($perKategori as $id => $jml) {
-            $baris[] = ($namaKategori[$id] ?? 'Lainnya') . ': ' . $jml;
+            $baris[] = ($namaKategori[$id] ?? 'Lainnya').': '.$jml;
         }
         rsort($baris);
 
-        return "Dataset peta: total " . array_sum($perKategori->toArray())
-            . " titik lokasi. Sebaran per kategori - " . implode(', ', $baris) . '.';
+        return 'Dataset peta: total '.array_sum($perKategori->toArray())
+            .' titik lokasi. Sebaran per kategori - '.implode(', ', $baris).'.';
     }
 
     /**
@@ -69,6 +71,7 @@ class PetaContextService
             if ($terdekat->isNotEmpty()) {
                 $baris = $terdekat->map(function (Location $loc) use ($lat, $lng) {
                     $d = $this->jarak($loc, $lat, $lng);
+
                     return sprintf(
                         '%s (%s) di %s, %.1f km dari user',
                         $loc->name,
@@ -78,7 +81,7 @@ class PetaContextService
                     );
                 })->all();
 
-                $bagian[] = "Lokasi terdekat dari posisi user:\n- " . implode("\n- ", $baris);
+                $bagian[] = "Lokasi terdekat dari posisi user:\n- ".implode("\n- ", $baris);
             } else {
                 $bagian[] = 'Tidak ada lokasi dari database dalam radius 100 km dari posisi user.';
             }
@@ -87,8 +90,9 @@ class PetaContextService
         // Pencarian berdasarkan kata kunci dari pertanyaan.
         $kataKunci = $this->keywords($message);
 
-        if (!empty($kataKunci)) {
+        if (! empty($kataKunci)) {
             $cocok = Location::query()
+                ->publiclyVisible()
                 ->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES))
                 ->where(function ($q) use ($kataKunci) {
                     foreach ($kataKunci as $kata) {
@@ -101,7 +105,8 @@ class PetaContextService
 
             if ($cocok->isNotEmpty()) {
                 $baris = $cocok->map(function (Location $loc) {
-                    $rating = $loc->rating_count > 0 ? $loc->avg_rating . '/5 (' . $loc->rating_count . ' ulasan)' : 'belum ada ulasan';
+                    $rating = $loc->rating_count > 0 ? $loc->avg_rating.'/5 ('.$loc->rating_count.' ulasan)' : 'belum ada ulasan';
+
                     return sprintf(
                         '%s | %s | %s | koordinat %.4f, %.4f | %s',
                         $loc->name,
@@ -113,11 +118,11 @@ class PetaContextService
                     );
                 })->all();
 
-                $bagian[] = "Lokasi yang cocok dengan kata kunci ("
-                    . implode(', ', $kataKunci) . "):\n- " . implode("\n- ", $baris);
+                $bagian[] = 'Lokasi yang cocok dengan kata kunci ('
+                    .implode(', ', $kataKunci)."):\n- ".implode("\n- ", $baris);
             } else {
                 $bagian[] = 'Tidak ada lokasi di database yang cocok dengan kata kunci '
-                    . implode(', ', $kataKunci) . '.';
+                    .implode(', ', $kataKunci).'.';
             }
         }
 
@@ -152,14 +157,16 @@ class PetaContextService
         return array_slice(array_keys($hasil), 0, 8);
     }
 
-    public function nearbyLocations(float $lat, float $lng, float $radiusKm = 100, int $limit = 10): \Illuminate\Support\Collection
+    public function nearbyLocations(float $lat, float $lng, float $radiusKm = 100, int $limit = 10): Collection
     {
         return Location::query()
+            ->publiclyVisible()
             ->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES))
             ->with(['category'])
             ->get()
             ->map(function (Location $loc) use ($lat, $lng) {
                 $loc->setAttribute('jarak_km', $this->jarak($loc, $lat, $lng));
+
                 return $loc;
             })
             ->filter(fn (Location $loc) => $loc->jarak_km <= $radiusKm)

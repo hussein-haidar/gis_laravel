@@ -201,6 +201,21 @@ class PhotoReviewPageTest extends TestCase
         $this->getJson(route('geojson.show', $loc))->assertNotFound();
     }
 
+    public function test_pending_location_is_hidden_from_navigation_search(): void
+    {
+        $pending = $this->photoLocation('Candi Prambanan');
+        $approved = $this->photoLocation('Candi Borobudur', Location::PHOTO_APPROVED);
+
+        $response = $this->actingAs($this->admin)
+            ->getJson(route('navigasi.locations', ['q' => 'Candi']));
+
+        $response->assertOk();
+        $ids = collect($response->json())->pluck('id');
+        $this->assertTrue($ids->contains($approved->id));
+        $this->assertFalse($ids->contains($pending->id));
+        $this->assertStringNotContainsString('Prambanan', $response->getContent());
+    }
+
     public function test_approved_location_is_visible_with_marker_photo_and_detail_page(): void
     {
         $loc = $this->photoLocation('Pantai Kuta', Location::PHOTO_APPROVED);

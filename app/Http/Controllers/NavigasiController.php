@@ -13,9 +13,7 @@ use Illuminate\View\View;
 
 class NavigasiController extends Controller
 {
-    public function __construct(protected RoutingService $routing)
-    {
-    }
+    public function __construct(protected RoutingService $routing) {}
 
     public function index(): View
     {
@@ -33,6 +31,7 @@ class NavigasiController extends Controller
 
         return response()->json(
             Location::query()
+                ->publiclyVisible()
                 ->with('category')
                 ->whereHas('category', function ($query) {
                     $query->whereIn('name', Category::PLACE_TYPES);

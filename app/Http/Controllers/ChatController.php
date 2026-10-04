@@ -16,7 +16,7 @@ class ChatController extends Controller
      */
     public function ask(Request $request, GroqService $groq, PetaContextService $peta)
     {
-        if (!$groq->enabled()) {
+        if (! $groq->enabled()) {
             return response()->json([
                 'reply' => __('chat.unavailable'),
                 'sources' => [],
@@ -147,8 +147,9 @@ PROMPT;
 
         $kataKunci = $peta->keywords($message);
 
-        if (!empty($kataKunci)) {
+        if (! empty($kataKunci)) {
             $cocok = Location::query()
+                ->publiclyVisible()
                 ->whereHas('category', fn ($q) => $q->whereIn('name', Category::PLACE_TYPES))
                 ->where(function ($q) use ($kataKunci) {
                     foreach ($kataKunci as $kata) {
