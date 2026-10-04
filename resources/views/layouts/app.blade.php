@@ -24,6 +24,18 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure/dist/leaflet-measure.css">
 <link rel="stylesheet" href="{{ asset('css/chat-widget.css') }}">
 
+    <style>
+        /* Kontrol peta (Leaflet) dan panelnya dibuat position:absolute/fixed
+             dengan z-index 800-2000, sedangkan navbar bawaan Bootstrap tidak
+             punya z-index. Akibatnya box info/legend peta bisa menimpa menu
+             navbar. Navbar dikunci di atas semua layer peta supaya menu
+             Peta/Navigasi/Admin tidak pernah tertutup. */
+        .navbar {
+            position: relative;
+            z-index: 1040;
+        }
+    </style>
+
     @stack('styles')
     @yield('styles')
 </head>
