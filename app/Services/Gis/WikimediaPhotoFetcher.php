@@ -259,6 +259,11 @@ class WikimediaPhotoFetcher
                 'photo_source_url' => $url,
                 'photo_source_provider' => $candidate['source'],
                 'photo_fetched_at' => now(),
+                // Foto baru selalu masuk antrean persetujuan admin: judul yang cocok
+                // belum menjamin fotonya memang gambar tempat itu.
+                'photo_review_status' => Location::PHOTO_PENDING,
+                'photo_reviewed_at' => null,
+                'photo_reviewed_by' => null,
             ]);
             $this->rememberOwnHash($loc, $body);
 

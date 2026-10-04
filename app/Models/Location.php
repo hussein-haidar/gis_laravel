@@ -21,14 +21,38 @@ class Location extends Model
         'photo_source_url',
         'photo_source_provider',
         'photo_fetched_at',
+        'photo_review_status',
+        'photo_reviewed_at',
+        'photo_reviewed_by',
         'geometry',
     ];
 
-    protected $appends = ['photo_url', 'photo_display'];
+    protected $appends = ['photo_url', 'photo_display', 'photo_raw_url'];
 
     protected $casts = [
         'geometry' => 'array',
+        'photo_reviewed_at' => 'datetime',
     ];
+
+    /** Status persetujuan foto: pending, approved, rejected. */
+    public const PHOTO_PENDING = 'pending';
+
+    public const PHOTO_APPROVED = 'approved';
+
+    public const PHOTO_REJECTED = 'rejected';
+
+    /**
+     * Foto yang sudah disetujui admin dan belum digantikan sumber baru.
+     * Lokasi tanpa foto selalu pending, karena tidak ada yang perlu disetujui.
+     */
+    public function scopeAwaitingPhotoReview($query)
+    {
+        return $query->whereNotNull('photo')
+            ->where(function ($q) {
+                $q->whereNull('photo_review_status')
+                    ->orWhere('photo_review_status', self::PHOTO_PENDING);
+            });
+    }
 
     public function category(): BelongsTo
     {
@@ -86,8 +110,33 @@ class Location extends Model
             return null;
         }
 
+        // Foto hasil fetch yang belum disetujui admin tidak ditampilkan di
+        // situs: semua foto wajib disetujui, jadi foto yang belum
+        // diperiksa tidak boleh ikut tayang. Admin tetap bisa melihatnya
+        // lewat path photo untuk keperluan review.
+        if ($this->photo_review_status === self::PHOTO_PENDING) {
+            return null;
+        }
+
         // existence dicek lewat disk, bukan file_exists(), supaya konsisten
         // dengan cleanup dan aman saat disk di-fake pada test.
+        return Storage::disk('public')->exists($this->photo)
+            ? asset('storage/'.$this->photo)
+            : null;
+    }
+
+    /**
+     * URL foto apa adanya, tanpa ikut aturan persetujuan.
+     *
+     * Dipakai halaman admin: saat review, foto yang belum disetujui justru
+     * harus terlihat agar bisa dinilai.
+     */
+    public function getPhotoRawUrlAttribute(): ?string
+    {
+        if (empty($this->photo)) {
+            return null;
+        }
+
         return Storage::disk('public')->exists($this->photo)
             ? asset('storage/'.$this->photo)
             : null;

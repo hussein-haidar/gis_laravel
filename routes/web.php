@@ -106,6 +106,11 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
     Route::get('profile', [AuthController::class, 'showProfile'])->name('profile');
     Route::post('profile', [AuthController::class, 'updateProfile'])->name('profile.update');
 
+    // Persetujuan foto lokasi: foto hasil fetch tidak tayang sebelum disetujui.
+    Route::get('photo-review', [\App\Http\Controllers\Admin\PhotoReviewController::class, 'index'])->name('photo-review.index');
+    Route::post('photo-review/approve', [\App\Http\Controllers\Admin\PhotoReviewController::class, 'approve'])->name('photo-review.approve');
+    Route::post('photo-review/reject', [\App\Http\Controllers\Admin\PhotoReviewController::class, 'reject'])->name('photo-review.reject');
+
     Route::resource('locations', \App\Http\Controllers\Admin\LocationController::class)->except(['show']);
     Route::post('locations/bulk-delete', [\App\Http\Controllers\Admin\LocationController::class, 'bulkDelete'])->name('locations.bulk-delete');
     Route::get('locations/jarak', [\App\Http\Controllers\Admin\LocationController::class, 'distance'])->name('locations.distance');

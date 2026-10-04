@@ -44,9 +44,9 @@
     @error('photo')
         <div class="invalid-feedback">{{ $message }}</div>
     @enderror
-    @if (!empty($location->photo_url))
+@if (!empty($location->photo_raw_url))
         <div class="mt-2">
-            <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" id="photo-preview"
+            <img src="{{ $location->photo_raw_url }}" alt="{{ $location->name }}" id="photo-preview"
                  style="width:160px;height:110px;object-fit:cover;border-radius:8px;"
                  onerror="this.style.display='none'">
             <div class="form-text">Foto saat ini. Pilih file baru untuk menggantinya.</div>

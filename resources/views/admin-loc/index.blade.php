@@ -187,8 +187,11 @@
                                 <td><input type="checkbox" name="location_ids[]" value="{{ $location->id }}" class="form-check-input location-check"></td>
                                 <td>{{ $locations->firstItem() + $index }}</td>
                                 <td>
-                                    @if ($location->photo_url)
-                                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" class="location-thumb" onerror="this.style.display='none'">
+                                    @if ($location->photo_raw_url)
+                                        <img src="{{ $location->photo_raw_url }}" alt="{{ $location->name }}" class="location-thumb" onerror="this.style.display='none'">
+                                        @if ($location->photo_review_status === \App\Models\Location::PHOTO_PENDING)
+                                            <span class="badge bg-warning text-dark">Menunggu verifikasi</span>
+                                        @endif
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif

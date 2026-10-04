@@ -7,6 +7,9 @@ use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Setting;
+use App\Models\User;
+use App\Notifications\GisSyncStatus;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -62,6 +65,7 @@ class GisDataSyncService
 
             if (empty($features)) {
                 Log::warning('No features found in API response');
+
                 return $this->stats;
             }
 
@@ -88,11 +92,11 @@ class GisDataSyncService
             ));
 
             if ($this->stats['errors'] > 0) {
-                \App\Models\User::query()
+                User::query()
                     ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'super_admin']))
                     ->get()
                     ->each
-                    ->notify(new \App\Notifications\GisSyncStatus($this->stats));
+                    ->notify(new GisSyncStatus($this->stats));
             }
 
             $this->fetchMissingPhotos();
@@ -139,7 +143,7 @@ class GisDataSyncService
         return $allFeatures;
     }
 
-    protected function makeRequest(int $page = 1): \Illuminate\Http\Client\Response
+    protected function makeRequest(int $page = 1): Response
     {
         $url = $this->config['api_url'];
         $params = [];
@@ -155,7 +159,7 @@ class GisDataSyncService
 
         if ($this->config['api_key']) {
             $request->withHeaders([
-                'Authorization' => 'Bearer ' . $this->config['api_key'],
+                'Authorization' => 'Bearer '.$this->config['api_key'],
                 'X-API-Key' => $this->config['api_key'],
             ]);
         }
@@ -163,15 +167,15 @@ class GisDataSyncService
         return $request->get($url, $params);
     }
 
-    protected function extractFeatures(\Illuminate\Http\Client\Response $response): array
+    protected function extractFeatures(Response $response): array
     {
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             throw new \Exception("API request failed: {$response->status()} - {$response->body()}");
         }
 
         $data = $response->json();
 
-        if (!$data) {
+        if (! $data) {
             throw new \Exception('Invalid JSON response from API');
         }
 
@@ -200,9 +204,10 @@ class GisDataSyncService
         $geometry = $feature['geometry'] ?? null;
 
         $identifier = $this->getIdentifier($properties);
-        if (!$identifier) {
+        if (! $identifier) {
             $this->stats['skipped']++;
             Log::warning('Skipping feature: missing identifier', ['feature' => $feature]);
+
             return;
         }
 
@@ -250,7 +255,17 @@ class GisDataSyncService
                 } elseif ($localField === 'category') {
                     $locationData['category_id'] = $this->resolveCategory($value);
                 } elseif ($localField === 'photo') {
-                    $locationData['photo'] = $this->downloadPhoto($value);
+                    $path = $this->downloadPhoto($value);
+                    $locationData['photo'] = $path;
+
+                    if ($path !== null) {
+                        // Foto dari API GIS tetap perlu diperiksa manusia:
+                        // judul sumbernya tidak dijamin menyebut nama tempat.
+                        $locationData['photo_source_title'] = 'Foto dari API GIS: '.$value;
+                        $locationData['photo_source_provider'] = 'gis-sync';
+                        $locationData['photo_fetched_at'] = now();
+                        $locationData['photo_review_status'] = Location::PHOTO_PENDING;
+                    }
                 } else {
                     $locationData[$localField] = is_string($value) ? trim($value) : $value;
                 }
@@ -382,13 +397,13 @@ class GisDataSyncService
 
     protected function normalizeGeometry(array $geometry): array
     {
-        if (!isset($geometry['type'], $geometry['coordinates'])) {
+        if (! isset($geometry['type'], $geometry['coordinates'])) {
             return ['type' => 'Point', 'coordinates' => [0, 0]];
         }
 
         $allowedTypes = ['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon'];
 
-        if (!in_array($geometry['type'], $allowedTypes)) {
+        if (! in_array($geometry['type'], $allowedTypes)) {
             return ['type' => 'Point', 'coordinates' => [0, 0]];
         }
 
@@ -408,6 +423,7 @@ class GisDataSyncService
 
         if (isset($this->config['category_mapping'][$categoryName])) {
             $mappedName = $this->config['category_mapping'][$categoryName];
+
             return Category::firstOrCreate(['name' => $mappedName])->id;
         }
 
@@ -422,15 +438,16 @@ class GisDataSyncService
      */
     protected function fetchMissingPhotos(): void
     {
-        if (!config('services.openverse.auto_fetch_after_sync', true)) {
+        if (! config('services.openverse.auto_fetch_after_sync', true)) {
             return;
         }
 
-        $fetcher = new WikimediaPhotoFetcher();
+        $fetcher = new WikimediaPhotoFetcher;
 
         $missing = $fetcher->locationsMissingPhoto();
         if ($missing->isEmpty()) {
             Log::info('No missing photos after GIS sync');
+
             return;
         }
 
@@ -464,7 +481,7 @@ class GisDataSyncService
                     $success++;
                 }
             } catch (\Throwable $e) {
-                Log::error('Auto photo fetch failed for ' . $loc->name . ': ' . $e->getMessage());
+                Log::error('Auto photo fetch failed for '.$loc->name.': '.$e->getMessage());
             }
 
             usleep((int) config('services.openverse.auto_fetch_sleep_ms', 1000) * 1000);
@@ -506,20 +523,20 @@ class GisDataSyncService
     {
         $url = trim((string) $photoValue);
 
-        if (empty($url) || !Str::startsWith($url, ['http://', 'https://'])) {
+        if (empty($url) || ! Str::startsWith($url, ['http://', 'https://'])) {
             return null;
         }
 
         try {
             $response = Http::timeout(10)->maxRedirects(3)->get($url);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return null;
             }
 
             $body = $response->body();
 
-            if (strlen($body) > 5 * 1024 * 1024 || !@getimagesizefromstring($body)) {
+            if (strlen($body) > 5 * 1024 * 1024 || ! @getimagesizefromstring($body)) {
                 return null;
             }
 
@@ -541,7 +558,7 @@ class GisDataSyncService
                 default => 'jpg',
             };
 
-            $path = 'photos/sync_' . uniqid('', true) . '.' . $extension;
+            $path = 'photos/sync_'.uniqid('', true).'.'.$extension;
 
             return Storage::disk('public')->put($path, $body) ? $path : null;
         } catch (\Throwable) {

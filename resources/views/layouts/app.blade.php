@@ -96,6 +96,16 @@
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.import') }}">Impor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.export') }}">Ekspor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.reviews.index') }}">Moderasi Review</a></li>
+                                <li>
+                                    <a class="dropdown-item d-flex justify-content-between align-items-center gap-3"
+                                       href="{{ route('admin.photo-review.index') }}">
+                                        <span>Verifikasi Foto</span>
+                                        @php($pendingPhotosSuper = \App\Models\Location::awaitingPhotoReview()->count())
+                                        @if ($pendingPhotosSuper > 0)
+                                            <span class="badge bg-warning text-dark">{{ $pendingPhotosSuper }}</span>
+                                        @endif
+                                    </a>
+                                </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('super-admin.activity-log') }}">Log Aktivitas</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
@@ -121,6 +131,16 @@
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.import') }}">Impor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.export') }}">Ekspor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.reviews.index') }}">Moderasi Review</a></li>
+                                <li>
+                                    <a class="dropdown-item d-flex justify-content-between align-items-center gap-3"
+                                       href="{{ route('admin.photo-review.index') }}">
+                                        <span>Verifikasi Foto</span>
+                                        @php($pendingPhotos = \App\Models\Location::awaitingPhotoReview()->count())
+                                        @if ($pendingPhotos > 0)
+                                            <span class="badge bg-warning text-dark">{{ $pendingPhotos }}</span>
+                                        @endif
+                                    </a>
+                                </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
                                 <li><hr class="dropdown-divider"></li>

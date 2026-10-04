@@ -7,7 +7,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\Location;
+use App\Models\NavigationHistory;
+use App\Models\User;
+use App\Services\Gis\GisDataSyncService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -15,8 +20,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Services\Gis\GisDataSyncService;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class LocationController extends Controller
 {
@@ -52,8 +55,8 @@ class LocationController extends Controller
             'locations_per_category' => Category::withCount('locations')
                 ->orderByDesc('locations_count')
                 ->get(),
-            'total_navigation_history' => \App\Models\NavigationHistory::count(),
-            'total_users' => \App\Models\User::count(),
+            'total_navigation_history' => NavigationHistory::count(),
+            'total_users' => User::count(),
         ];
 
         return view('admin-loc.index', compact('locations', 'categories', 'search', 'categoryId', 'stats'));
@@ -66,13 +69,20 @@ class LocationController extends Controller
         return view('admin-loc.create', compact('categories'));
     }
 
-public function store(Request $request)
+    public function store(Request $request)
     {
         $data = $this->validated($request);
 
         // Handle main photo (backward compatibility)
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('photos', 'public');
+
+            // Foto yang diunggah admin sendiri tidak perlu antrean verifikasi.
+            $data['photo_review_status'] = Location::PHOTO_APPROVED;
+            $data['photo_reviewed_at'] = now();
+            $data['photo_reviewed_by'] = $request->user()->id;
+            $data['photo_source_title'] = 'Unggahan admin';
+            $data['photo_source_provider'] = 'admin';
         }
 
         $data['geometry'] = $this->buildGeometry($request);
@@ -111,6 +121,14 @@ public function store(Request $request)
                 Storage::disk('public')->delete($location->photo);
             }
             $data['photo'] = $request->file('photo')->store('photos', 'public');
+
+            // Unggahan admin = foto yang sudah dipilih manusia, jadi langsung
+            // disetujui dan antrean review lama tidak berlaku lagi.
+            $data['photo_review_status'] = Location::PHOTO_APPROVED;
+            $data['photo_reviewed_at'] = now();
+            $data['photo_reviewed_by'] = $request->user()->id;
+            $data['photo_source_title'] = 'Unggahan admin';
+            $data['photo_source_provider'] = 'admin';
         }
 
         // Handle multiple photos
@@ -146,7 +164,7 @@ public function store(Request $request)
 
         foreach ($files as $index => $file) {
             $path = $file->store('photos', 'public');
-            $isPrimary = !$hasPrimary && $index === 0;
+            $isPrimary = ! $hasPrimary && $index === 0;
 
             $location->photos()->create([
                 'path' => $path,
@@ -238,7 +256,7 @@ public function store(Request $request)
 
         return redirect()
             ->route('admin.locations.index')
-            ->with('success', count($ids) . ' lokasi berhasil dihapus.');
+            ->with('success', count($ids).' lokasi berhasil dihapus.');
     }
 
     public function radiusForm(): View
@@ -293,7 +311,7 @@ public function store(Request $request)
                 $distance = $gpsLocation->distanceTo($to);
                 $route = ['from' => $gpsLocation, 'to' => $to];
             }
-        } elseif ($fromId && $toId && $fromId !== $toId && !$isGps) {
+        } elseif ($fromId && $toId && $fromId !== $toId && ! $isGps) {
             $from = Location::with('category')->find($fromId);
             $to = Location::with('category')->find($toId);
 
@@ -323,14 +341,14 @@ public function store(Request $request)
             ->when($categoryId, function ($query) use ($categoryId) {
                 $query->where('category_id', $categoryId);
             })
-->orderBy('name')
+            ->orderBy('name')
             ->get();
 
         if (! in_array($format, ['csv', 'json', 'xlsx', 'pdf'])) {
             $format = 'csv';
         }
 
-        $filename = 'lokasi_' . now()->format('Y-m-d_His') . '.' . $format;
+        $filename = 'lokasi_'.now()->format('Y-m-d_His').'.'.$format;
 
         // Log export activity
         ActivityLog::create([
@@ -355,6 +373,7 @@ public function store(Request $request)
 
         if ($format === 'pdf') {
             $pdf = Pdf::loadView('admin-loc.pdf', ['locations' => $locations]);
+
             return $pdf->download($filename);
         }
 
@@ -423,13 +442,14 @@ public function store(Request $request)
             $row = collect($row)
                 ->mapWithKeys(fn ($value, $key) => [strtolower(trim((string) $key)) => is_string($value) ? trim($value) : $value])
                 ->all();
-            $line = 'Baris ' . ($index + 2);
+            $line = 'Baris '.($index + 2);
 
             $geometry = null;
-            if (!empty($row['geometry'])) {
+            if (! empty($row['geometry'])) {
                 $geometry = $this->parseGeometry(is_string($row['geometry']) ? $row['geometry'] : json_encode($row['geometry']));
-                if (!$geometry) {
+                if (! $geometry) {
                     $errors[] = "{$line}: kolom geometry bukan GeoJSON yang valid.";
+
                     continue;
                 }
             }
@@ -454,7 +474,8 @@ public function store(Request $request)
             ]);
 
             if ($validator->fails()) {
-                $errors[] = "{$line}: " . collect($validator->errors()->all())->implode('; ');
+                $errors[] = "{$line}: ".collect($validator->errors()->all())->implode('; ');
+
                 continue;
             }
 
@@ -464,7 +485,7 @@ public function store(Request $request)
                 'longitude' => (float) $longitude,
             ];
 
-            if (array_key_exists('category', $row) && !empty($row['category'])) {
+            if (array_key_exists('category', $row) && ! empty($row['category'])) {
                 $attributes['category_id'] = Category::firstOrCreate(['name' => trim((string) $row['category'])])->id;
             }
 
@@ -500,7 +521,7 @@ public function store(Request $request)
         $message = "{$imported} lokasi berhasil diimpor.";
         $problems = array_merge($errors, $warnings);
         if (count($problems) > 0) {
-            $message .= ' ' . count($problems) . " catatan. Detail: " . implode(' | ', array_slice($problems, 0, 5));
+            $message .= ' '.count($problems).' catatan. Detail: '.implode(' | ', array_slice($problems, 0, 5));
         }
 
         // Log import activity
@@ -525,7 +546,7 @@ public function store(Request $request)
             ->with(count($warnings) > 0 ? 'warning' : 'success', $message);
     }
 
-    private function parseCsvImport(\Illuminate\Http\UploadedFile $file): array
+    private function parseCsvImport(UploadedFile $file): array
     {
         $handle = fopen($file->getRealPath(), 'r');
         $header = fgetcsv($handle) ?: [];
@@ -537,11 +558,12 @@ public function store(Request $request)
             $row = array_map(fn ($item) => trim($item ?? ''), $row);
             if (count($header) === count($row)) {
                 $rows[] = array_combine($header, $row);
+
                 continue;
             }
             $keys = $header;
             while (count($keys) < count($row)) {
-                $keys[] = 'kolom_' . (count($keys) + 1);
+                $keys[] = 'kolom_'.(count($keys) + 1);
             }
             $rows[] = array_combine(array_slice($keys, 0, count($row)), array_slice($row, 0, count($keys)));
         }
@@ -550,19 +572,19 @@ public function store(Request $request)
         return $rows;
     }
 
-    private function parseJsonImport(\Illuminate\Http\UploadedFile $file): array
+    private function parseJsonImport(UploadedFile $file): array
     {
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $file->get() ?? '');
         $decoded = json_decode($content, true);
 
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             return [];
         }
 
         return array_map(fn ($row) => is_array($row) ? (object) $row : $row, $decoded);
     }
 
-    private function parseXlsxImport(\Illuminate\Http\UploadedFile $file): array
+    private function parseXlsxImport(UploadedFile $file): array
     {
         $sheets = Excel::toArray(new class implements WithHeadingRow {}, $file->getRealPath());
 
@@ -589,13 +611,13 @@ public function store(Request $request)
 
         $decoded = json_decode($raw, true);
 
-        if (!is_array($decoded) || !isset($decoded['type'], $decoded['coordinates'])) {
+        if (! is_array($decoded) || ! isset($decoded['type'], $decoded['coordinates'])) {
             return null;
         }
 
         $allowed = ['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon'];
 
-        if (!in_array($decoded['type'], $allowed) || !is_array($decoded['coordinates'])) {
+        if (! in_array($decoded['type'], $allowed) || ! is_array($decoded['coordinates'])) {
             return null;
         }
 
@@ -614,13 +636,13 @@ public function store(Request $request)
                 return null;
             }
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return null;
             }
 
             $body = $response->body();
 
-            if (strlen($body) > 5 * 1024 * 1024 || !@getimagesizefromstring($body)) {
+            if (strlen($body) > 5 * 1024 * 1024 || ! @getimagesizefromstring($body)) {
                 return null;
             }
 
@@ -631,7 +653,7 @@ public function store(Request $request)
                 default => 'jpg',
             };
 
-            $path = 'photos/' . uniqid('import_', true) . '.' . $extension;
+            $path = 'photos/'.uniqid('import_', true).'.'.$extension;
 
             return Storage::disk('public')->put($path, $body) ? $path : null;
         }
@@ -662,12 +684,12 @@ public function store(Request $request)
         $type = $request->input('geometry_type');
         $coordsRaw = $request->input('geometry_coords');
 
-        if (!$type || !$coordsRaw) {
+        if (! $type || ! $coordsRaw) {
             return null;
         }
 
         $coords = json_decode($coordsRaw, true);
-        if (!is_array($coords)) {
+        if (! is_array($coords)) {
             return null;
         }
 
@@ -684,10 +706,10 @@ public function store(Request $request)
             'old_values' => $oldValues,
             'new_values' => $newValues,
             'description' => match ($type) {
-                'location_created' => "Menambahkan lokasi: " . ($subject?->name ?? $oldValues['name'] ?? ''),
-                'location_updated' => "Memperbarui lokasi: " . ($subject?->name ?? $oldValues['name'] ?? ''),
-                'location_deleted' => "Menghapus lokasi: " . ($oldValues['name'] ?? ''),
-                default => "Aksi pada lokasi",
+                'location_created' => 'Menambahkan lokasi: '.($subject?->name ?? $oldValues['name'] ?? ''),
+                'location_updated' => 'Memperbarui lokasi: '.($subject?->name ?? $oldValues['name'] ?? ''),
+                'location_deleted' => 'Menghapus lokasi: '.($oldValues['name'] ?? ''),
+                default => 'Aksi pada lokasi',
             },
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
@@ -719,7 +741,7 @@ public function store(Request $request)
         } catch (\Throwable $e) {
             return redirect()
                 ->route('admin.locations.index')
-                ->with('error', 'Sinkronisasi gagal: ' . $e->getMessage());
+                ->with('error', 'Sinkronisasi gagal: '.$e->getMessage());
         }
     }
 
