@@ -187,8 +187,8 @@
                                 <td><input type="checkbox" name="location_ids[]" value="{{ $location->id }}" class="form-check-input location-check"></td>
                                 <td>{{ $locations->firstItem() + $index }}</td>
                                 <td>
-                                    @if ($location->photo)
-                                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" class="location-thumb" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
+                                    @if ($location->photo_url)
+                                        <img src="{{ $location->photo_url }}" alt="{{ $location->name }}" class="location-thumb" onerror="this.style.display='none'">
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
@@ -283,8 +283,10 @@
 
             const marker = L.marker([parseFloat(location.latitude), parseFloat(location.longitude)], { icon: icon });
 
-            const placeholderUrl = '{{ route('placeholder.show', ':id') }}'.replace(':id', location.id);
-            const photo = `<img src="${location.photo_url || placeholderUrl}" onerror="this.onerror=null;this.src='${placeholderUrl}'" style="width:160px;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
+            // Tanpa foto asli tidak ada gambar sama sekali - jangan pakai placeholder.
+            const photo = location.photo_url
+                ? `<img src="${location.photo_url}" onerror="this.style.display='none'" style="width:160px;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`
+                : '';
             const category = location.category
                 ? `<span style="color:${color};font-weight:600">● ${location.category.name}</span><br>` : '';
 

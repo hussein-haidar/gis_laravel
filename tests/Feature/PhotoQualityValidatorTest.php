@@ -121,7 +121,7 @@ class PhotoQualityValidatorTest extends TestCase
 
     public function test_it_rejects_a_single_flat_color(): void
     {
-        $result = $this->validator->inspect($this->solidCanvas(300, 300, [200, 235, 255]));
+        $result = $this->validator->inspect($this->solidCanvas(600, 600, [200, 235, 255]));
 
         $this->assertFalse($result['ok']);
         $this->assertSame('solid_color', $result['reason']);
@@ -137,17 +137,50 @@ class PhotoQualityValidatorTest extends TestCase
 
     public function test_it_reports_dimensions_for_accepted_images(): void
     {
-        $result = $this->validator->inspect($this->photoLike(320, 240, seed: 7));
+        $result = $this->validator->inspect($this->photoLike(640, 480, seed: 7));
 
         $this->assertTrue($result['ok']);
-        $this->assertSame(320, $result['width']);
-        $this->assertSame(240, $result['height']);
+        $this->assertSame(640, $result['width']);
+        $this->assertSame(480, $result['height']);
     }
 
     public function test_is_usable_matches_inspect(): void
     {
-        $this->assertTrue($this->validator->isUsable($this->photoLike(200, 150)));
-        $this->assertFalse($this->validator->isUsable($this->solidCanvas(200, 150, [0, 0, 0])));
+        $this->assertTrue($this->validator->isUsable($this->photoLike(400, 300)));
+        $this->assertFalse($this->validator->isUsable($this->solidCanvas(400, 300, [0, 0, 0])));
+    }
+
+    /**
+     * Logo atau ikon 32x32 harus ditolak, tapi sebagai kegagalan "lemah":
+     * lokasi boleh di-fetch ulang dengan kandidat lain, tidak langsung
+     * dihapus seperti placeholder yang isinya bukan foto.
+     */
+    public function test_it_rejects_a_tiny_logo_as_soft_failure(): void
+    {
+        $result = $this->validator->inspect($this->photoLike(64, 64, seed: 3));
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('too_small', $result['reason']);
+        $this->assertTrue($this->validator->isSoftFailure($result['reason']));
+        $this->assertFalse($this->validator->isHardFailure($result['reason']));
+    }
+
+    public function test_it_rejects_a_banner_as_soft_failure(): void
+    {
+        $result = $this->validator->inspect($this->photoLike(1800, 400, seed: 5));
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('extreme_ratio', $result['reason']);
+        $this->assertTrue($this->validator->isSoftFailure($result['reason']));
+    }
+
+    public function test_placeholder_on_white_is_a_hard_failure(): void
+    {
+        $result = $this->validator->inspect($this->textOnWhite(800, 600));
+
+        $this->assertSame('text_on_white', $result['reason']);
+        $this->assertTrue($this->validator->isHardFailure($result['reason']));
+        $this->assertFalse($this->validator->isSoftFailure($result['reason']));
     }
 
     public function test_inspect_file_reports_missing_file(): void

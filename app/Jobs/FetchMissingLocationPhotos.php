@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\Gis\PhotoMaintenance;
 use App\Services\Gis\WikimediaPhotoFetcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -24,8 +25,7 @@ class FetchMissingLocationPhotos implements ShouldQueue
     public function __construct(
         public ?int $chunkSize = null,
         public int $chunk = 0
-    ) {
-    }
+    ) {}
 
     /**
      * Isi foto lokasi yang masih kosong. Job dipanggil dari sync service lalu
@@ -38,9 +38,10 @@ class FetchMissingLocationPhotos implements ShouldQueue
             ?: (int) config('services.openverse.auto_fetch_limit', 50);
 
         $missing = $fetcher->locationsMissingPhoto();
-
         if ($missing->isEmpty()) {
             Log::info('FetchMissingLocationPhotos: semua lokasi sudah punya foto');
+            $this->deleteStillEmpty();
+
             return;
         }
 
@@ -56,7 +57,7 @@ class FetchMissingLocationPhotos implements ShouldQueue
                     $success++;
                 }
             } catch (\Throwable $e) {
-                Log::error('Auto photo fetch failed for ' . $loc->name . ': ' . $e->getMessage());
+                Log::error('Auto photo fetch failed for '.$loc->name.': '.$e->getMessage());
             }
 
             $done++;
@@ -75,11 +76,36 @@ class FetchMissingLocationPhotos implements ShouldQueue
         if ($remaining > 0) {
             self::dispatch($this->chunkSize, $this->chunk + 1)
                 ->delay(now()->addSeconds(10));
+
+            return;
+        }
+
+        $this->deleteStillEmpty();
+    }
+
+    /**
+     * Setelah tidak ada lagi lokasi kosong, jalankan pembersihan otomatis.
+     *
+     * Lokasi yang tetap tanpa foto (tidak ada kandidat di Commons) dihapus,
+     * sesuai aturan: lebih baik tidak ada lokasi daripada lokasi yang
+     * fotonya bukan gambar tempat. Lokasi tanpa foto tidak pernah muncul di
+     * frontend karena tidak ada fallback placeholder.
+     */
+    protected function deleteStillEmpty(): void
+    {
+        if (! config('services.openverse.auto_cleanup_after_fetch', true)) {
+            return;
+        }
+
+        try {
+            app(PhotoMaintenance::class)->run();
+        } catch (\Throwable $e) {
+            Log::error('Photo maintenance after fetch failed: '.$e->getMessage());
         }
     }
 
     public function failed(\Throwable $e): void
     {
-        Log::error('FetchMissingLocationPhotos gagal: ' . $e->getMessage());
+        Log::error('FetchMissingLocationPhotos gagal: '.$e->getMessage());
     }
 }

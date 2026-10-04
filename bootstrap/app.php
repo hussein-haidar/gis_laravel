@@ -26,6 +26,21 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->runInBackground()
             ->appendOutputTo(storage_path('logs/gis-sync.log'));
+
+        // Pembersihan foto otomatis: lepas placeholder/foto lemah, hapus
+        // lokasi yang tetap tanpa foto. Tidak perlu dijalankan manual.
+        $schedule->command('photos:cleanup --delete-empty')
+            ->dailyAt('04:30')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/photos-cleanup.log'));
+
+        // Foto diisi lewat queue job. Tanpa worker, job fetch menumpuk di
+        // tabel jobs dan tidak pernah jalan, jadi worker pendek dijalankan
+        // terjadwal sebagai pengganti supervisor.
+        $schedule->command('queue:work --stop-when-empty --max-time=600')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
     })
     ->withProviders([
         \App\Providers\EventServiceProvider::class,

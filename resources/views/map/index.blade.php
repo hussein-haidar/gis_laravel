@@ -228,7 +228,11 @@
         @forelse ($locations as $location)
             <div class="col">
                 <a href="{{ route('map.show', $location) }}" class="card location-card h-100 text-decoration-none text-dark">
-                    <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" loading="lazy" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
+                    @if ($location->photo_url)
+                        <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" loading="lazy" onerror="this.style.display='none'">
+                    @else
+                        <div class="bg-light" style="height:180px;"></div>
+                    @endif
                     <div class="card-body">
                         <h3 class="h6 mb-1">{{ $location->name }}</h3>
                         @if ($location->category)
@@ -426,8 +430,10 @@
                     placeName: p.category || '',
                 });
 
-                const placeholderUrl = '{{ route('placeholder.show', ':id') }}'.replace(':id', p.id);
-                const photo = `<img src="${p.photo_url || placeholderUrl}" onerror="this.onerror=null;this.src='${placeholderUrl}'" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`;
+                // Tanpa foto asli tidak ada gambar sama sekali - jangan pakai placeholder.
+                const photo = p.photo_url
+                    ? `<img src="${p.photo_url}" onerror="this.style.display='none'" alt="${p.name}" style="width:180px;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px"><br>`
+                    : '';
                 const category = p.category
                     ? `<span style="color:${color};font-weight:600">● ${p.category}</span><br>` : '';
                 const wilayahBadge = (p.wilayah && p.provinsi)

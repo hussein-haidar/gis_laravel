@@ -23,6 +23,22 @@ class WikimediaPhotoFetcher
 
     protected const COMMONS_PAGE_SIZE = 6;
 
+    /**
+     * Kata kunci judul yang menandai gambar non-foto.
+     *
+     * Dipakai untuk membuang kandidat seperti "Peta Kota Bandung.png" atau
+     * "Logo Universitas X.png" yang secara teknis lolos sebagai jpeg tetapi
+     * sama sekali bukan foto tempatnya.
+     *
+     * @var array<int, string>
+     */
+    protected const NON_PHOTO_TITLE_WORDS = [
+        'peta', 'map of', 'locator map', 'denah', 'diagram', 'sketsa', 'sketch',
+        'logo', 'lambang', 'coat of arms', 'seal of', 'flag of', 'bendera',
+        'chart', 'grafik', 'graph', 'poster', 'plakat', 'plaque', 'signboard',
+        'screenshot', 'cover', 'collage', 'montage', 'panorama',
+    ];
+
     public function __construct(
         ?string $token = null,
         protected ?PhotoQualityValidator $validator = null,
@@ -167,10 +183,13 @@ class WikimediaPhotoFetcher
                 continue;
             }
 
-            // Buang kanvas putih bertulis, bidang warna rata, dan gambar
-            // hitam/putih penuh sebelum berkas menyentuh disk.
-            if (! $this->validator->isUsable($body)) {
-                $this->validator->logRejected($loc->name, $this->validator->inspect($body));
+            // Buang kanvas putih bertulis, bidang warna rata, gambar
+            // hitam/putih penuh, logo 32x32, dan banner/petapanoramik
+            // sebelum berkas menyentuh disk.
+            $verdict = $this->validator->inspect($body);
+
+            if (! $verdict['ok']) {
+                $this->validator->logRejected($loc->name, $verdict);
 
                 continue;
             }
@@ -312,8 +331,44 @@ class WikimediaPhotoFetcher
             return;
         }
 
-        $candidate['score'] = $this->relevanceScore($candidate['title'], $query);
+        // Judul berniat "peta", "logo", "denah", atau "diagram" menandakan
+        // gambar yang bukan foto tempat, meskipun Commons menyajikan-nya
+        // sebagai jpeg.
+        if ($this->looksLikeNonPhoto($candidate['title'])) {
+            Log::debug('Candidate skipped (non-photo title): '.$candidate['title']);
+
+            return;
+        }
+
+        $score = $this->relevanceScore($candidate['title'], $query);
+
+        // Tidak ada satupun kata kunci nama lokasi yang muncul di judul:
+        // kemungkinan besar hasil pencarian ini milik tempat lain.
+        if ($score <= 0) {
+            Log::debug('Candidate skipped (no keyword match): '.$candidate['title']);
+
+            return;
+        }
+
+        $candidate['score'] = $score;
         $scored[$candidate['url']] = $candidate;
+    }
+
+    /**
+     * True bila judul berkas menandakan gambar non-foto: peta, logo, denah,
+     * diagram, plakat, dan sejenisnya.
+     */
+    protected function looksLikeNonPhoto(string $title): bool
+    {
+        $title = mb_strtolower($title);
+
+        foreach (self::NON_PHOTO_TITLE_WORDS as $word) {
+            if (str_contains($title, $word)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

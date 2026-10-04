@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MapController::class, 'index'])->name('map.index');
 Route::get('lokasi/{location}', [MapController::class, 'show'])->name('map.show');
-Route::get('placeholder/{location}', [\App\Http\Controllers\PlaceholderController::class, 'show'])->name('placeholder.show');
 
 Route::middleware('auth')->group(function () {
     Route::post('lokasi/{location}/reviews', [\App\Http\Controllers\ReviewController::class, 'store'])->name('reviews.store');

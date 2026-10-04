@@ -58,6 +58,11 @@ return [
         'auto_fetch_limit' => (int) env('OPENVERSE_AUTO_FETCH_LIMIT', 50),
         'auto_fetch_sleep_ms' => (int) env('OPENVERSE_AUTO_FETCH_SLEEP_MS', 1000),
         'queue_fetch' => env('OPENVERSE_QUEUE_FETCH', true),
+
+        // Jalankan photos:cleanup otomatis setelah sinkronisasi dan setelah
+        // job fetch selesai, plus harian lewat scheduler. Menonaktifkan ini
+        // membuat placeholder hanya dibersihkan bila command dijalankan manual.
+        'auto_cleanup_after_fetch' => env('OPENVERSE_AUTO_CLEANUP_AFTER_FETCH', true),
     ],
 
     'groq' => [

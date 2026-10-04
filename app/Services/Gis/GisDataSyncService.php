@@ -96,6 +96,7 @@ class GisDataSyncService
             }
 
             $this->fetchMissingPhotos();
+            $this->runPhotoMaintenance();
 
             Log::info('GIS data sync completed', $this->stats);
         } catch (\Throwable $e) {
@@ -479,6 +480,28 @@ class GisDataSyncService
         Log::info('Auto photo fetch after GIS sync', $this->photoFetchStats);
     }
 
+    /**
+     * Bersihkan foto dan isi ulang yang kosong, otomatis setiap sinkronisasi.
+     *
+     * Diletakkan setelah fetchMissingPhotos() supaya admin tidak perlu
+     * menjalankan photos:cleanup sendiri. Foto placeholder yang lolos dari
+     * API eksternal pun ikut dibuang di sini.
+     */
+    protected function runPhotoMaintenance(): void
+    {
+        if (! config('services.openverse.auto_cleanup_after_fetch', true)) {
+            return;
+        }
+
+        try {
+            $stats = app(PhotoMaintenance::class)->refresh();
+
+            $this->photoFetchStats['cleanup'] = $stats;
+        } catch (\Throwable $e) {
+            Log::error('Photo maintenance after sync failed: '.$e->getMessage());
+        }
+    }
+
     protected function downloadPhoto(mixed $photoValue): ?string
     {
         $url = trim((string) $photoValue);
@@ -497,6 +520,17 @@ class GisDataSyncService
             $body = $response->body();
 
             if (strlen($body) > 5 * 1024 * 1024 || !@getimagesizefromstring($body)) {
+                return null;
+            }
+
+            // API eksternal bisa mengembalikan kanvas bertulis atau bidang
+            // warna rata. Validasi di sini mencegah placeholder ikut
+            // terpasang setiap kali admin menekan tombol sinkronisasi.
+            $verdict = app(PhotoQualityValidator::class)->inspect($body);
+
+            if (! $verdict['ok']) {
+                Log::warning('Sync photo rejected', $verdict + ['url' => $url]);
+
                 return null;
             }
 

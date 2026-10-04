@@ -31,6 +31,7 @@ class CleanupPhotos extends Command
                             {--placeholders : Hanya hapus placeholder/bukan-foto}
                             {--duplicates : Hanya lepas foto duplikat lintas lokasi}
                             {--missing : Hanya null-kan path foto yang hilang}
+                            {--delete-empty : Hapus record lokasi yang fotonya kosong}
                             {--quarantine= : Pindahkan berkas ke folder ini alih-alih menghapus}
                             {--limit=0 : Batasi jumlah berkas yang diproses per kategori}';
 
@@ -65,8 +66,10 @@ class CleanupPhotos extends Command
         $stats = [
             'orphans_deleted' => 0,
             'placeholders_deleted' => 0,
+            'weak_cleared' => 0,
             'duplicates_cleared' => 0,
             'missing_nulled' => 0,
+            'locations_deleted' => 0,
             'bytes_freed' => 0,
         ];
 
@@ -89,18 +92,72 @@ class CleanupPhotos extends Command
         }
 
         if (in_array('missing', $only, true)) {
-            $this->handleMissing($dryRun, $stats);
+            $this->handleMissing($disk, $dryRun, $stats);
+        }
+
+        if ($this->option('delete-empty')) {
+            $this->handleDeleteEmpty($disk, $dryRun, $stats);
         }
 
         $this->newLine();
         $this->info('=== Ringkasan ===');
         $this->line("  Orphan dihapus       : {$stats['orphans_deleted']}");
         $this->line("  Placeholder dihapus  : {$stats['placeholders_deleted']}");
+        $this->line("  Foto lemah di-refetch: {$stats['weak_cleared']}");
         $this->line("  Duplikat di-null-kan : {$stats['duplicates_cleared']}");
         $this->line("  Path hilang di-null  : {$stats['missing_nulled']}");
+        $this->line("  Lokasi dihapus       : {$stats['locations_deleted']}");
         $this->line('  Ruang dibebaskan    : '.number_format($stats['bytes_freed'] / 1024 / 1024, 2).' MB');
 
         return 0;
+    }
+
+    /**
+     * Lokasi tanpa foto dihapus, bukan dibiarkan dengan photo NULL.
+     *
+     * Aturan ini yang dipakai otomatis setelah sinkronisasi/fetch: lebih baik
+     * tidak ada lokasi daripada lokasi yang fotonya bukan gambar tempat.
+     * Karena itu jalankan setelah tahap fetch, supaya lokasi yang masih bisa
+     * mendapat foto tidak ikut terhapus.
+     */
+    protected function handleDeleteEmpty($disk, bool $dryRun, array &$stats): void
+    {
+        // "Tanpa foto" berarti kolom kosong ATAU path-nya menunjuk berkas
+        // yang sudah tidak ada di storage.
+        $empty = Location::query()
+            ->with('category')
+            ->get(['id', 'name', 'photo', 'category_id'])
+            ->filter(fn (Location $loc) => empty($loc->photo) || ! $disk->exists($loc->photo))
+            ->values();
+
+        if ($empty->isEmpty()) {
+            $this->line('Lokasi tanpa foto: 0');
+
+            return;
+        }
+
+        $this->info(sprintf('Lokasi tanpa foto yang akan dihapus: %d', $empty->count()));
+
+        $byCategory = [];
+        foreach ($empty as $loc) {
+            $byCategory[$loc->category?->name ?? '(tanpa kategori)'][] = $loc->name;
+        }
+
+        foreach ($byCategory as $cat => $names) {
+            $this->line(sprintf('  - %s: %d (%s)', $cat, count($names), mb_strimwidth(implode(', ', $names), 0, 90)));
+        }
+
+        if ($dryRun) {
+            $stats['locations_deleted'] = $empty->count();
+
+            return;
+        }
+
+        // Cascade di level database: location_photos, reviews, dan favorites
+        // ikut terhapus karena seluruhnya cascadeOnDelete.
+        $stats['locations_deleted'] = Location::query()
+            ->whereIn('id', $empty->pluck('id'))
+            ->delete();
     }
 
     /**
@@ -159,7 +216,7 @@ class CleanupPhotos extends Command
             }
             $checked++;
 
-            $result = $validator->inspectFile(storage_path('app/public/'.$file));
+            $result = $validator->inspect((string) $disk->get($file));
 
             if (! $result['ok']) {
                 $rejected[$file] = $result['reason'];
@@ -174,7 +231,8 @@ class CleanupPhotos extends Command
         }
 
         foreach ($byReason as $reason => $files) {
-            $this->line("  - {$reason}: ".count($files).' berkas');
+            $label = $validator->isSoftFailure($reason) ? 'lemah (refetch)' : 'keras';
+            $this->line("  - {$reason} [{$label}]: ".count($files).' berkas');
         }
 
         foreach ($rejected as $file => $reason) {
@@ -187,7 +245,12 @@ class CleanupPhotos extends Command
                 $this->removeOrQuarantine($disk, $full, $quarantine);
                 $this->nullPhotoFor(basename($file));
             }
-            $stats['placeholders_deleted']++;
+
+            if ($validator->isSoftFailure($reason)) {
+                $stats['weak_cleared']++;
+            } else {
+                $stats['placeholders_deleted']++;
+            }
         }
     }
 
@@ -207,13 +270,11 @@ class CleanupPhotos extends Command
             ->get(['id', 'name', 'photo']);
 
         foreach ($locations as $loc) {
-            $path = storage_path('app/public/'.$loc->photo);
-
-            if (! is_file($path)) {
+            if (! $disk->exists($loc->photo)) {
                 continue;
             }
 
-            $groups[md5_file($path)][] = $loc;
+            $groups[md5((string) $disk->get($loc->photo))][] = $loc;
         }
 
         $duplicatedGroups = array_filter($groups, fn ($g) => count($g) > 1);
@@ -249,7 +310,7 @@ class CleanupPhotos extends Command
     /**
      * Path di DB yang menunjuk berkas sudah tidak ada.
      */
-    protected function handleMissing(bool $dryRun, array &$stats): void
+    protected function handleMissing($disk, bool $dryRun, array &$stats): void
     {
         $missing = [];
 
@@ -259,7 +320,7 @@ class CleanupPhotos extends Command
             ->with('category')
             ->whereNotNull('photo')
             ->get(['id', 'name', 'photo', 'category_id']) as $loc) {
-            if (! file_exists(storage_path('app/public/'.$loc->photo))) {
+            if (! $disk->exists($loc->photo)) {
                 $missing[] = $loc;
             }
         }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Location extends Model
 {
@@ -77,14 +78,25 @@ class Location extends Model
 
     public function getPhotoUrlAttribute(): ?string
     {
-        if (empty($this->photo)) return null;
-        $path = storage_path('app/public/' . $this->photo);
-        return file_exists($path) ? asset('storage/' . $this->photo) : null;
+        if (empty($this->photo)) {
+            return null;
+        }
+
+        // existence dicek lewat disk, bukan file_exists(), supaya konsisten
+        // dengan cleanup dan aman saat disk di-fake pada test.
+        return Storage::disk('public')->exists($this->photo)
+            ? asset('storage/'.$this->photo)
+            : null;
     }
 
+    /**
+     * URL foto untuk ditampilkan. String kosong bila tidak ada foto asli —
+     * viewer wajib menyembunyikan elemen gambar, bukan menggantinya dengan
+     * placeholder, karena placeholder bukan gambar sebenarnya dari tempat itu.
+     */
     public function getPhotoDisplayAttribute(): string
     {
-        return $this->photo_url ?? route('placeholder.show', $this);
+        return $this->photo_url ?? '';
     }
 
     public function getGeoJsonGeometryAttribute(): array

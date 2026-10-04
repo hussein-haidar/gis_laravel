@@ -83,6 +83,20 @@ class PhotoQualityValidator
 
         [$w, $h] = $info;
 
+        // Dimensi checked sebelum decoding: logo, ikon, dan peta panoramik
+        // lolos dari analisis warna karena warnanya memang banyak, tapi
+        // jelas bukan foto lokasi.
+        $shortSide = min($w, $h);
+        $longSide = max($w, $h);
+
+        if ($shortSide < self::MIN_SHORT_SIDE) {
+            return $fail('too_small', ['width' => $w, 'height' => $h]);
+        }
+
+        if ($longSide / max(1, $shortSide) >= self::MAX_ASPECT_RATIO) {
+            return $fail('extreme_ratio', ['width' => $w, 'height' => $h]);
+        }
+
         // Gambar raksasa tidak mungkin placeholder dan GD mendecode-nya pada
         // resolusi penuh, yang bisa menghabiskan ratusan MB. Lewati analisis
         // piksel untuk gambar di atas ambang ini.
@@ -200,7 +214,47 @@ class PhotoQualityValidator
         return $result;
     }
 
-    /** True bila berkas layak dipakai sebagai foto lokasi. */
+    /**
+     * Sisi terpendek minimum (px). Berkas 32x32 atau 240x180 yang lolos
+     * biasanya logo, ikon, atau thumbnail peta, bukan foto tempat.
+     */
+    protected const MIN_SHORT_SIDE = 300;
+
+    /**
+     * Rasio sisi maksimum. Rasio >= 3 berarti banner, kolase, atau peta
+     * panoramik - bukan foto satu tempat.
+     */
+    protected const MAX_ASPECT_RATIO = 3.0;
+
+    /**
+     * Alasan yang hanya berarti "kandidat buruk", bukan "gambar palsu".
+     *
+     * Logo 32x32 atau peta panoramik memang bukan foto tempat, tapi banyak
+     * foto asli tempat yang syutingnya kecil atau letterbox (Candi Prambanan
+     * 600x280, Museum Keraton 320x240). Berkas seperti ini dilepas supaya
+     * bisa di-fetch ulang dengan kandidat lebih baik; record lokasi baru
+     * dihapus bila setelah itu fotonya tetap kosong.
+     *
+     * @var array<int, string>
+     */
+    protected const SOFT_REASONS = ['too_small', 'extreme_ratio'];
+
+    /** Alasan keras: isi gambar jelas bukan foto (kanvas polos, teks, rusak). */
+    protected const HARD_REASONS = ['solid_color', 'flat_fill', 'text_on_white', 'flat_color', 'unreadable'];
+
+    /** True bila hasil inspect() berarti "cari kandidat lain", bukan "hapus lokasi". */
+    public function isSoftFailure(?string $reason): bool
+    {
+        return in_array($reason, self::SOFT_REASONS, true);
+    }
+
+    /** True bila hasilnya placeholder palsu yang tidak mungkin dipakai. */
+    public function isHardFailure(?string $reason): bool
+    {
+        return in_array($reason, self::HARD_REASONS, true);
+    }
+
+    /** True bila berkasnya foto layak dipakai tanpa perlu di-fetch ulang. */
     public function isUsable(string $binary): bool
     {
         return $this->inspect($binary)['ok'];

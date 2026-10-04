@@ -21,7 +21,11 @@
                     <div class="card h-100 position-relative">
                         <button type="button" class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2 btn-unfavorite"
                                 data-url="{{ route('favorites.toggle', $loc) }}" title="{{ __('messages.remove_from_favorites') }}">♥</button>
-                        <img src="{{ $loc->photo_display }}" class="card-img-top" alt="{{ $loc->name }}" style="height:150px;object-fit:cover;" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $loc) }}'">
+                        @if ($loc->photo_url)
+                            <img src="{{ $loc->photo_display }}" class="card-img-top" alt="{{ $loc->name }}" style="height:150px;object-fit:cover;" onerror="this.style.display='none'">
+                        @else
+                            <div class="card-img-top bg-light" style="height:150px;"></div>
+                        @endif
                         <div class="card-body">
                             <h2 class="h6 mb-1">{{ $loc->name }}</h2>
                             @if ($loc->category)

@@ -302,7 +302,9 @@
         <div class="col-lg-8">
             <div class="card mb-4 shadow-sm border-0">
                 <div class="card-body">
-                    <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" class="detail-photo mb-3" onerror="this.onerror=null;this.src='{{ route('placeholder.show', $location) }}'">
+                    @if ($location->photo_url)
+                        <img src="{{ $location->photo_display }}" alt="{{ $location->name }}" class="detail-photo mb-3" onerror="this.style.display='none'">
+                    @endif
 
                     <h1 class="h3 mb-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
                         {{ $location->name }}
