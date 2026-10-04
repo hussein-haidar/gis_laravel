@@ -5,10 +5,11 @@
 @section('content')
     <h1 class="h3 mb-2">Verifikasi Foto Lokasi</h1>
     <p class="text-muted">
-        Semua foto dari sumber luar harus disetujui dulu sebelum tampil di peta.
-        Centang foto yang benar lalu klik <strong>Setujui</strong>. Foto yang
-        ditolak akan dihapus bersama lokasinya, karena lokasi tanpa foto tidak
-        ditampilkan.
+        Foto yang punya bukti kuat (koordinat sumber di dekat lokasi, atau kategori Commons yang
+        menyebut nama tempat) sudah <strong>otomatis disetujui</strong>
+        (<strong>{{ $counts['auto_approved'] }}</strong> foto). Yang ada di halaman ini hanya foto
+        yang belum punya bukti, jadi tidak perlu memeriksa semuanya satu per satu.
+        Foto yang ditolak akan dihapus bersama lokasinya.
     </p>
 
     <ul class="nav nav-tabs mb-3">
@@ -46,6 +47,21 @@
     @endif
     @if (session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
+
+    @if ($counts['pending'] > 0)
+        <form method="POST" class="mb-3"
+              onsubmit="return confirm('Setujui {{ $counts['pending'] }} foto sekaligus? Foto yang salah masih bisa ditolak setelahnya.');">
+            @csrf
+            <button type="submit" class="btn btn-outline-success btn-sm"
+                    formaction="{{ route('admin.photo-review.approve-all') }}">
+                ⚡ Setujui semua yang menunggu ({{ $counts['pending'] }})
+            </button>
+            <span class="text-muted small ms-1">
+                quicker: foto sudah lolos aturan judul, koordinat, dan kategori. Tinggal disetujui
+                sekaligus bila Anda yakin.
+            </span>
+        </form>
     @endif
 
     <form method="POST" id="reviewForm">
@@ -116,6 +132,14 @@
                                             </div>
                                         @else
                                             <span class="badge bg-danger">Tanpa metadata sumber</span>
+                                        @endif
+                                        @if ($photo->photo_review_note)
+                                            <div class="small text-muted fst-italic">{{ $photo->photo_review_note }}</div>
+                                        @endif
+                                        @if ($photo->photo_source_distance_m !== null)
+                                            <span class="badge bg-{{ $photo->photo_source_distance_m <= 800 ? 'success' : 'secondary' }}">
+                                                {{ number_format($photo->photo_source_distance_m) }} m dari lokasi
+                                            </span>
                                         @endif
                                     </td>
                                     <td>

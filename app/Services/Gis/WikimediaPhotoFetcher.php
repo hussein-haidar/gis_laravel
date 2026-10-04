@@ -54,6 +54,14 @@ class WikimediaPhotoFetcher
     protected const MIN_TITLE_MATCH_RATIO = 0.6;
 
     /**
+     * Jarak maksimal koordinat sumber agar foto dianggap benar-benar foto
+     * lokasi ini, dan jarak untuk menyetujuinya tanpa diperiksa manusia.
+     */
+    protected const MAX_SOURCE_DISTANCE_M = 5000;
+
+    protected const AUTO_APPROVE_DISTANCE_M = 800;
+
+    /**
      * Kata umum pada nama lokasi yang tidak bisa membedakan tempat.
      *
      * @var array<int, string>
@@ -201,6 +209,30 @@ class WikimediaPhotoFetcher
         foreach ($candidates as $candidate) {
             $url = $candidate['url'];
 
+            $sourceEvidence = $this->sourceEvidence($candidate['title'] ?? null, $url);
+
+            // Bukti dari berkas Commons: koordinat (foto diambil di lokasi
+            // ini) atau kategori (berkas memang milik tempat ini). Kalau
+            // koordinatnya jauh, kandidat dibuang karena itu tempat lain.
+            $evidence = $this->judgeSource(
+                $candidate['title'] ?? null,
+                $url,
+                $loc->latitude !== null ? (float) $loc->latitude : null,
+                $loc->longitude !== null ? (float) $loc->longitude : null,
+                (string) $loc->name
+            );
+
+            if ($evidence['verdict'] === 'too_far') {
+                Log::info(sprintf(
+                    'Photo skipped (%s): %s <= %s',
+                    $evidence['note'],
+                    $loc->name,
+                    $candidate['title']
+                ));
+
+                continue;
+            }
+
             try {
                 $resp = Http::withHeaders(['User-Agent' => $this->userAgent()])
                     ->timeout(25)
@@ -259,11 +291,18 @@ class WikimediaPhotoFetcher
                 'photo_source_url' => $url,
                 'photo_source_provider' => $candidate['source'],
                 'photo_fetched_at' => now(),
-                // Foto baru selalu masuk antrean persetujuan admin: judul yang cocok
-                // belum menjamin fotonya memang gambar tempat itu.
-                'photo_review_status' => Location::PHOTO_PENDING,
-                'photo_reviewed_at' => null,
+                'photo_source_lat' => $sourceEvidence['lat'] ?? null,
+                'photo_source_lon' => $sourceEvidence['lon'] ?? null,
+                'photo_source_distance_m' => $evidence['distance_m'],
+                // Foto yang buktinya kuat (koordinat dekat atau kategori
+                // sumber yang menyebut nama tempat) tidak perlu antrean
+                // manual. Sisanya menunggu diperiksa manusia.
+                'photo_review_status' => $evidence['verdict'] === 'auto'
+                    ? Location::PHOTO_APPROVED
+                    : Location::PHOTO_PENDING,
+                'photo_reviewed_at' => $evidence['verdict'] === 'auto' ? now() : null,
                 'photo_reviewed_by' => null,
+                'photo_review_note' => $evidence['note'],
             ]);
             $this->rememberOwnHash($loc, $body);
 
@@ -478,6 +517,218 @@ class WikimediaPhotoFetcher
 
         // Dan judul harus tetap menyebut sebagian besar nama keseluruhan.
         return $this->titleMatchRatio($title, $locationName) >= self::MIN_TITLE_MATCH_RATIO;
+    }
+
+    /** @var array<string, array{lat: ?float, lon: ?float, categories: array<int, string>}|null> */
+    protected array $evidenceCache = [];
+
+    /**
+     * Jarak dua titik koordinat dalam meter (haversine).
+     */
+    public static function distanceMeters(float $lat1, float $lon1, float $lat2, float $lon2): float
+    {
+        $earthRadius = 6371000;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+
+        return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
+    protected function isAutoApprovable(?float $distance): bool
+    {
+        return $distance !== null && $distance <= self::AUTO_APPROVE_DISTANCE_M;
+    }
+
+    /**
+     * Bukti dari berkas Commons: koordinat dan kategori.
+     *
+     * Koordinat = bukti kuat foto diambil di lokasi itu. Kategori (mis.
+     * "Category:Museum Bank Indonesia") = bukti kuat berkas memang milik
+     * tempat tersebut, dipakai saat koordinat tidak tersedia.
+     *
+     * @return array{lat: ?float, lon: ?float, categories: array<int, string>}|null
+     */
+    public function sourceEvidence(?string $title, ?string $url = null): ?array
+    {
+        $file = self::commonsFileTitle($title, $url);
+
+        if ($file === null) {
+            return null;
+        }
+
+        if (! array_key_exists($file, $this->evidenceCache)) {
+            $this->evidenceCache[$file] = $this->fetchSourceEvidence($file);
+        }
+
+        return $this->evidenceCache[$file];
+    }
+
+    /**
+     * Putuskan worthy/tidaknya foto tanpa pemeriksaan manusia.
+     *
+     * @return array{verdict: string, distance_m: ?int, note: string}
+     */
+    public function judgeSource(
+        ?string $title,
+        ?string $url,
+        ?float $lat,
+        ?float $lon,
+        string $locationName
+    ): array {
+        $evidence = $this->sourceEvidence($title, $url);
+
+        if ($evidence === null) {
+            return [
+                'verdict' => 'pending',
+                'distance_m' => null,
+                'note' => 'Sumber foto tidak punya data lokasi',
+            ];
+        }
+
+        $distance = null;
+
+        if ($evidence['lat'] !== null && $lat !== null && $lat !== 0.0) {
+            $distance = self::distanceMeters($lat, $lon ?? 0.0, $evidence['lat'], $evidence['lon'] ?? 0.0);
+
+            if ($distance > self::MAX_SOURCE_DISTANCE_M) {
+                return [
+                    'verdict' => 'too_far',
+                    'distance_m' => (int) round($distance),
+                    'note' => sprintf('Koordinat sumber %.0f m dari lokasi (terlalu jauh)', $distance),
+                ];
+            }
+        }
+
+        if ($distance !== null && $distance <= self::AUTO_APPROVE_DISTANCE_M) {
+            return [
+                'verdict' => 'auto',
+                'distance_m' => (int) round($distance),
+                'note' => sprintf('Auto: koordinat sumber %.0f m dari lokasi', $distance),
+            ];
+        }
+
+        $matchedCategory = $this->matchingCategory($evidence['categories'], $locationName);
+
+        if ($matchedCategory !== null) {
+            return [
+                'verdict' => 'auto',
+                'distance_m' => $distance === null ? null : (int) round($distance),
+                'note' => 'Auto: kategori sumber "'.$matchedCategory.'"',
+            ];
+        }
+
+        return [
+            'verdict' => 'pending',
+            'distance_m' => $distance === null ? null : (int) round($distance),
+            'note' => $distance === null
+                ? 'Sumber tidak punya koordinat maupun kategori yang cocok'
+                : sprintf('Koordinat sumber %.0f m dari lokasi (perlu diperiksa)', $distance),
+        ];
+    }
+
+    /**
+     * Kategori Commons yang menyebut nama lokasi, atau null.
+     *
+     * Semua kata bermakna nama lokasi harus ada, bukan hanya kata khas:
+     * kategori "Bank Indonesia" tidak boleh dianggap sebagai bukti untuk
+     * "Museum Bank Indonesia" karena kata "museum" tidak disebut.
+     */
+    public function matchingCategory(array $categories, string $locationName): ?string
+    {
+        $needles = $this->needles($locationName);
+
+        if ($needles === []) {
+            return null;
+        }
+
+        foreach ($categories as $category) {
+            $haystack = mb_strtolower(preg_replace('/^Category\s*:/i', '', (string) $category));
+            $found = true;
+
+            foreach ($needles as $word) {
+                if (! str_contains($haystack, $word)) {
+                    $found = false;
+
+                    break;
+                }
+            }
+
+            if ($found) {
+                return $category;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Nama berkas Commons ("File:xxx.jpg").
+     *
+     * Openverse mengembalikan judul tampilan tanpa prefik "File:", sedangkan
+     * URL unduhan Wikimedia memuat nama berkasnya. Jadi kalau judul tidak
+     * bisa dipakai, nama berkas diambil dari URL.
+     */
+    public static function commonsFileTitle(?string $title, ?string $url = null): ?string
+    {
+        $title = trim((string) $title);
+
+        if (preg_match('/^File\s*:/i', $title)) {
+            return $title;
+        }
+
+        if ($url !== null && preg_match('#/commons/[^/]+/[^/]+/(.+)$#', $url, $m)) {
+            return 'File:'.rawurldecode($m[1]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{lat: ?float, lon: ?float, categories: array<int, string>}|null
+     */
+    protected function fetchSourceEvidence(string $file): ?array
+    {
+        try {
+            $resp = Http::withHeaders(['User-Agent' => $this->userAgent()])
+                ->timeout(15)
+                ->get('https://commons.wikimedia.org/w/api.php', [
+                    'action' => 'query',
+                    'format' => 'json',
+                    'prop' => 'coordinates|categories',
+                    'cllimit' => 'max',
+                    'titles' => $file,
+                ]);
+        } catch (\Throwable $e) {
+            Log::debug('Source evidence lookup failed for '.$file.': '.$e->getMessage());
+
+            return null;
+        }
+
+        foreach ($resp->json('query.pages') ?? [] as $page) {
+            if (($page['missing'] ?? null) !== null) {
+                return null;
+            }
+
+            $coord = $page['coordinates'][0] ?? null;
+            $categories = [];
+
+            foreach ($page['categories'] ?? [] as $category) {
+                if (isset($category['title'])) {
+                    $categories[] = (string) $category['title'];
+                }
+            }
+
+            return [
+                'lat' => is_array($coord) && isset($coord['lat']) ? (float) $coord['lat'] : null,
+                'lon' => is_array($coord) && isset($coord['lon']) ? (float) $coord['lon'] : null,
+                'categories' => $categories,
+            ];
+        }
+
+        return null;
     }
 
     /** 0.0 - 1.0: berapa bagian nama lokasi yang disebut judul sumber. */

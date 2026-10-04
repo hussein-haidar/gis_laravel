@@ -42,6 +42,15 @@ class RefillLocationPhotos extends Command
             $processed = $this->fetchRound($fetcher, $sleep, $limit);
             $this->line("  Foto terpasang: {$processed}");
 
+            // Foto yang punya bukti kuat (koordinat sumber dekat lokasi atau
+            // kategori Commons yang menyebut nama tempat) langsung
+            // disetujui supaya tidak menumpuk di antrean manual.
+            $this->callSilently('photos:locate-sources');
+            $auto = Location::where('photo_review_status', Location::PHOTO_APPROVED)
+                ->where('photo_review_note', 'like', 'Auto:%')
+                ->count();
+            $this->line("  Foto terverifikasi otomatis: {$auto}");
+
             // Lepas dulu foto yang sumbernya milik tempat lain. Ini harus
             // sebelum hapus lokasi supaya foto salah sumber diperlakukan
             // sama dengan tidak ada foto: lokasinya dihapus di putaran ini

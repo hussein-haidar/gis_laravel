@@ -13,10 +13,10 @@ use Illuminate\View\View;
 /**
  * Persetujuan foto lokasi.
  *
- * Semua foto hasil fetch dianggap belum tentu benar sebagai gambar tempat,
- * jadi statusnya "pending" dan tidak tampil di peta sampai disetujui di sini.
- * Foto yang ditolak dihapus bersama lokasinya: tidak ada foto, tidak ada
- * lokasi.
+ * Foto yang punya bukti kuat (koordinat sumber dekat lokasi, atau kategori
+ * Commons yang menyebut nama tempat) sudah otomatis disetujui, jadi antrean
+ * manual hanya berisi foto yang meragukan. Sisa antrean bisa disetujui atau
+ * ditolak satu per satu, atau sekaligus satu klik.
  */
 class PhotoReviewController extends Controller
 {
@@ -41,9 +41,40 @@ class PhotoReviewController extends Controller
             'pending' => Location::awaitingPhotoReview()->count(),
             'approved' => Location::where('photo_review_status', Location::PHOTO_APPROVED)->count(),
             'rejected' => Location::where('photo_review_status', Location::PHOTO_REJECTED)->count(),
+            'auto_approved' => Location::where('photo_review_status', Location::PHOTO_APPROVED)
+                ->where('photo_review_note', 'like', 'Auto:%')
+                ->count(),
         ];
 
         return view('admin-photo-review.index', compact('photos', 'status', 'search', 'counts'));
+    }
+
+    /**
+     * Setujui seluruh antrean yang tersisa.
+     *
+     * Setelah verifikasi otomatis, sisa antrean biasanya kecil. Kalau admin
+     * sudah yakin dengan aturannya, satu klik ini menggantikan ratusan
+     * centangan.
+     */
+    public function approveAll(Request $request): RedirectResponse
+    {
+        $ids = Location::awaitingPhotoReview()->pluck('id')->all();
+        $count = count($ids);
+
+        if ($count === 0) {
+            return back()->with('error', 'Tidak ada foto yang menunggu persetujuan.');
+        }
+
+        Location::whereIn('id', $ids)->update([
+            'photo_review_status' => Location::PHOTO_APPROVED,
+            'photo_reviewed_at' => now(),
+            'photo_reviewed_by' => $request->user()->id,
+            'photo_review_note' => 'Disetujui manual: disetujui sekaligus dari halaman verifikasi',
+        ]);
+
+        $this->log($request, 'photo_approved', [$ids[0]], $count.' foto disetujui sekaligus dari halaman verifikasi');
+
+        return back()->with('success', "{$count} foto disetujui sekaligus.");
     }
 
     /** Setujui foto yang dicentang. */

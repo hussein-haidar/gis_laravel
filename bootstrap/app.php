@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\SetLocaleMiddleware;
+use App\Providers\EventServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,11 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'role' => RoleMiddleware::class,
         ]);
 
         $middleware->web(append: [
-            \App\Http\Middleware\SetLocaleMiddleware::class,
+            SetLocaleMiddleware::class,
         ]);
     })
     ->withSchedule(function ($schedule): void {
@@ -41,9 +44,17 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyFiveMinutes()
             ->withoutOverlapping()
             ->runInBackground();
+
+        // Verifikasi otomatis sumber foto (koordinat & kategori Commons).
+        // Foto yang buktinya kuat disetujui tanpa antrean manual; foto yang
+        // koordinatnya jauh justru dilepas supaya tidak salah tempat.
+        $schedule->command('photos:locate-sources --sleep=1')
+            ->dailyAt('05:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/photos-locate.log'));
     })
     ->withProviders([
-        \App\Providers\EventServiceProvider::class,
+        EventServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions): void {
         //

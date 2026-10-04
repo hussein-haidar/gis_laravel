@@ -20,10 +20,14 @@ class Location extends Model
         'photo_source_title',
         'photo_source_url',
         'photo_source_provider',
+        'photo_source_lat',
+        'photo_source_lon',
+        'photo_source_distance_m',
         'photo_fetched_at',
         'photo_review_status',
         'photo_reviewed_at',
         'photo_reviewed_by',
+        'photo_review_note',
         'geometry',
     ];
 

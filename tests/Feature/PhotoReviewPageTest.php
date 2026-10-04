@@ -153,4 +153,21 @@ class PhotoReviewPageTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('error');
     }
+
+    public function test_approve_all_clears_the_whole_queue_in_one_click(): void
+    {
+        $a = $this->photoLocation('Museum Satu');
+        $b = $this->photoLocation('Museum Dua');
+        $done = $this->photoLocation('Museum Tiga', Location::PHOTO_APPROVED);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.photo-review.approve-all'))
+            ->assertRedirect();
+
+        $this->assertSame(Location::PHOTO_APPROVED, $a->fresh()->photo_review_status);
+        $this->assertSame(Location::PHOTO_APPROVED, $b->fresh()->photo_review_status);
+        $this->assertSame(Location::PHOTO_APPROVED, $done->fresh()->photo_review_status);
+
+        $this->assertSame(0, Location::awaitingPhotoReview()->count());
+    }
 }
