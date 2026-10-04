@@ -25,7 +25,7 @@
     }
     .activity-item {
         padding: 12px 0;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid var(--app-border);
     }
     .activity-item:last-child { border-bottom: none; }
     .activity-icon {
@@ -35,7 +35,7 @@
         font-size: 1rem;
     }
     .progress-sm { height: 6px; border-radius: 3px; }
-    .category-row:hover { background: #f8fafc; }
+    .category-row:hover { background: var(--app-surface-alt); }
 </style>
 @endsection
 
@@ -217,12 +217,34 @@
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
+    const charts = [];
+
+    function isDark() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+
+    function chartSurface() {
+        return getComputedStyle(document.documentElement).getPropertyValue('--app-surface').trim() || '#fff';
+    }
+
+    function applyChartTheme() {
+        if (typeof Chart === 'undefined') return;
+        Chart.defaults.color = isDark() ? '#cbd5e1' : '#475569';
+        Chart.defaults.borderColor = isDark() ? 'rgba(148,163,184,.25)' : 'rgba(100,116,139,.2)';
+        Chart.defaults.plugins.legend.labels.color = isDark() ? '#e5e7eb' : '#334155';
+        charts.forEach(function (chart) { chart.update(); });
+    }
+
+    document.addEventListener('themechange', applyChartTheme);
+
     document.addEventListener('DOMContentLoaded', function() {
+        applyChartTheme();
+
         // Navigation Trend Chart
         const navTrendCtx = document.getElementById('navTrendChart');
         if (navTrendCtx) {
             const navData = @json($navigationTrend);
-            new Chart(navTrendCtx, {
+            charts.push(new Chart(navTrendCtx, {
                 type: 'line',
                 data: {
                     labels: navData.map(d => d.date),
@@ -242,14 +264,14 @@
                     plugins: { legend: { display: false } },
                     scales: { y: { beginAtZero: true } }
                 }
-            });
+            }));
         }
 
         // Location Growth Chart
         const locTrendCtx = document.getElementById('locationTrendChart');
         if (locTrendCtx) {
             const locData = @json($locationTrend);
-            new Chart(locTrendCtx, {
+            charts.push(new Chart(locTrendCtx, {
                 type: 'bar',
                 data: {
                     labels: locData.map(d => d.date),
@@ -268,14 +290,14 @@
                     plugins: { legend: { display: false } },
                     scales: { y: { beginAtZero: true } }
                 }
-            });
+            }));
         }
 
         // Vehicle Distribution Chart
         const vehicleCtx = document.getElementById('vehicleChart');
         if (vehicleCtx) {
             const vehicleData = @json($navigationStats['by_vehicle']);
-            new Chart(vehicleCtx, {
+            charts.push(new Chart(vehicleCtx, {
                 type: 'doughnut',
                 data: {
                     labels: vehicleData.map(d => d.vehicle),
@@ -283,7 +305,7 @@
                         data: vehicleData.map(d => d.total),
                         backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4', '#84cc16'],
                         borderWidth: 2,
-                        borderColor: '#fff',
+                        borderColor: chartSurface(),
                     }]
                 },
                 options: {
@@ -291,14 +313,14 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { position: 'bottom', labels: { padding: 15 } } }
                 }
-            });
+            }));
         }
 
         // Category Navigation Chart
         const catNavCtx = document.getElementById('catNavChart');
         if (catNavCtx) {
             const catData = @json($topNavCategories);
-            new Chart(catNavCtx, {
+            charts.push(new Chart(catNavCtx, {
                 type: 'bar',
                 data: {
                     labels: catData.map(d => d.name),
@@ -318,7 +340,7 @@
                     plugins: { legend: { display: false } },
                     scales: { x: { beginAtZero: true } }
                 }
-            });
+            }));
         }
     });
 </script>

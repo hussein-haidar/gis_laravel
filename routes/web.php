@@ -117,10 +117,7 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
     Route::post('profile', [AuthController::class, 'updateProfile'])->name('profile.update');
 
     // Persetujuan foto lokasi: foto hasil fetch tidak tayang sebelum disetujui.
-    Route::get('photo-review', [PhotoReviewController::class, 'index'])->name('photo-review.index');
-    Route::post('photo-review/approve', [PhotoReviewController::class, 'approve'])->name('photo-review.approve');
-    Route::post('photo-review/reject', [PhotoReviewController::class, 'reject'])->name('photo-review.reject');
-    Route::post('photo-review/approve-all', [PhotoReviewController::class, 'approveAll'])->name('photo-review.approve-all');
+    // Hak ini khusus role Admin (lihat grup route sendiri di bawah).
 
     Route::resource('locations', LocationController::class)->except(['show']);
     Route::post('locations/bulk-delete', [LocationController::class, 'bulkDelete'])->name('locations.bulk-delete');
@@ -144,4 +141,14 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
     Route::get('pengaturan', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('pengaturan/tes-key', [SettingsController::class, 'testKey'])->name('settings.test-key');
     Route::put('pengaturan', [SettingsController::class, 'update'])->name('settings.update');
+});
+
+// Verifikasi foto lokasi HANYA untuk role Admin. Super Admin sengaja
+// dikecualikan: persetujuan foto adalah tugas operasional harian admin,
+// sedangkan super admin fokus ke user, role, dan log aktivitas.
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('photo-review', [PhotoReviewController::class, 'index'])->name('photo-review.index');
+    Route::post('photo-review/approve', [PhotoReviewController::class, 'approve'])->name('photo-review.approve');
+    Route::post('photo-review/reject', [PhotoReviewController::class, 'reject'])->name('photo-review.reject');
+    Route::post('photo-review/approve-all', [PhotoReviewController::class, 'approveAll'])->name('photo-review.approve-all');
 });

@@ -42,8 +42,9 @@
         .nearest-card h3.h6 { line-height: 1.3; }
         .badge { font-weight: 500; padding: 0.4em 0.7em; }
         .map-legend {
-            background: #fff; padding: 8px 12px;
-            border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            background: var(--app-surface); color: var(--app-text);
+            padding: 8px 12px;
+            border-radius: 8px; box-shadow: var(--app-shadow);
             font-size: 13px; line-height: 1.7;
             margin-bottom: 24px;
             max-width: 270px;
@@ -55,19 +56,21 @@
         .map-legend-head {
             display: flex; align-items: center; justify-content: space-between;
             gap: 10px; position: sticky; top: -8px;
-            background: #fff; padding-bottom: 4px;
+            background: var(--app-surface); color: var(--app-text);
+            padding-bottom: 4px;
         }
         .map-legend-close {
-            border: 0; background: #e5e7eb; color: #111827;
+            border: 0; background: var(--app-surface-alt); color: var(--app-text);
             width: 22px; height: 22px; line-height: 1; padding: 0;
             border-radius: 5px; cursor: pointer; font-size: 15px; flex: 0 0 auto;
         }
-        .map-legend-close:hover { background: #d1d5db; }
+        .map-legend-close:hover { background: var(--app-border); }
         .map-legend-open {
             position: absolute; bottom: 30px; right: 10px; z-index: 1000;
-            background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
+            background: var(--app-surface); color: var(--app-text);
+            border: 1px solid var(--app-border); border-radius: 8px;
             padding: 4px 10px; font-size: 12px; cursor: pointer;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.4); display: none;
+            box-shadow: var(--app-shadow); display: none;
         }
         .map-legend-open.show { display: block; }
         .map-legend i {
@@ -745,11 +748,10 @@
                 legendRows.push(`<i style="background:${c}"></i> ${p.category || ''}`);
             });
 
-            // Box legend tidak muncul otomatis: dia ditumpuk di pojok kiri
-            // bawah peta dan bisa menutupi tombol zoom in/out. Pengguna
-            // membuka sendiri lewat tombol kecil "Legenda".
+            // Box legend TIDAK muncul otomatis: default-nya tertutup supaya
+            // tidak menutupi tombol zoom in/out di pojok kiri. Pengguna
+            // membuka sendiri lewat tombol kecil "Legenda" di pojok kanan bawah.
             const openBtn = document.getElementById('legend-open-btn');
-            if (openBtn) openBtn.classList.add('show');
 
             // Selalu pojok KANAN bawah peta, supaya tidak bertabrakan dengan tombol
             // zoom in / zoom out yang ada di pojok kiri.
@@ -769,30 +771,31 @@
 
                 div.querySelector('.map-legend-close').addEventListener('click', function () {
                     legend.remove();
-                    openBtn.classList.add('show');
+                    if (openBtn) openBtn.classList.add('show');
                     try { localStorage.setItem('mapLegendOpen', '0'); } catch (e) {}
                 });
 
                 return div;
             };
-legend.addTo(map);
-                legend.setPosition('bottomright');
 
-            // Tombol pemicu tampilnya legend.
+            const openLegend = function () {
+                legend.addTo(map);
+                legend.setPosition('bottomright');
+                if (openBtn) openBtn.classList.remove('show');
+                try { localStorage.setItem('mapLegendOpen', '1'); } catch (e) {}
+            };
+
             if (openBtn) {
-                openBtn.addEventListener('click', function () {
-legend.addTo(map);
-            legend.setPosition('bottomright');
-                    openBtn.classList.remove('show');
-                    try { localStorage.setItem('mapLegendOpen', '1'); } catch (e) {}
-                });
+                openBtn.addEventListener('click', openLegend);
             }
 
-            // Kalau user pernah membuka legend, tampilkan lagi.
+            // Kalau user pernah membuka legend, tampilkan lagi. Kalau belum
+            // pernah (kunci tidak ada) atau pernah menutupnya, tetap tertutup.
             let remembered = null;
             try { remembered = localStorage.getItem('mapLegendOpen'); } catch (e) {}
             if (remembered === '1') {
-                legend.remove();
+                openLegend();
+            } else if (openBtn) {
                 openBtn.classList.add('show');
             }
         }

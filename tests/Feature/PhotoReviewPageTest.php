@@ -59,6 +59,28 @@ class PhotoReviewPageTest extends TestCase
         $this->get(route('admin.photo-review.index'))->assertRedirect(route('login'));
     }
 
+    public function test_photo_verification_is_for_admin_role_only(): void
+    {
+        $superRole = Role::create(['name' => 'super_admin', 'label' => 'Super Admin']);
+        $super = User::factory()->create(['role_id' => $superRole->id]);
+        $loc = $this->photoLocation('Candi Prambanan');
+
+        // Super Admin tidak memegang hak verifikasi foto.
+        $this->actingAs($super)->get(route('admin.photo-review.index'))->assertForbidden();
+        $this->actingAs($super)
+            ->post(route('admin.photo-review.approve'), ['ids' => [$loc->id]])
+            ->assertForbidden();
+        $this->actingAs($super)
+            ->post(route('admin.photo-review.reject'), ['ids' => [$loc->id]])
+            ->assertForbidden();
+        $this->actingAs($super)->post(route('admin.photo-review.approve-all'))->assertForbidden();
+
+        $this->assertSame(Location::PHOTO_PENDING, $loc->fresh()->photo_review_status);
+
+        // Admin tetap punya akses penuh.
+        $this->actingAs($this->admin)->get(route('admin.photo-review.index'))->assertOk();
+    }
+
     public function test_page_lists_pending_photos_with_their_source(): void
     {
         $loc = $this->photoLocation('Candi Prambanan');

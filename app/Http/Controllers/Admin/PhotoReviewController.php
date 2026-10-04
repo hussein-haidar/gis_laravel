@@ -24,6 +24,8 @@ class PhotoReviewController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorizeAdmin($request);
+
         $status = $request->query('status', 'pending');
         $search = trim((string) $request->query('q', ''));
 
@@ -58,6 +60,8 @@ class PhotoReviewController extends Controller
      */
     public function approveAll(Request $request): RedirectResponse
     {
+        $this->authorizeAdmin($request);
+
         $ids = Location::awaitingPhotoReview()->pluck('id')->all();
         $count = count($ids);
 
@@ -80,6 +84,8 @@ class PhotoReviewController extends Controller
     /** Setujui foto yang dicentang. */
     public function approve(Request $request): RedirectResponse
     {
+        $this->authorizeAdmin($request);
+
         $ids = $this->selectedIds($request);
 
         if ($ids === []) {
@@ -105,6 +111,8 @@ class PhotoReviewController extends Controller
      */
     public function reject(Request $request): RedirectResponse
     {
+        $this->authorizeAdmin($request);
+
         $ids = $this->selectedIds($request);
 
         if ($ids === []) {
@@ -133,6 +141,15 @@ class PhotoReviewController extends Controller
         $this->log($request, 'photo_rejected', $ids, $deleted.' foto ditolak, lokasi dihapus: '.implode(', ', array_slice($names, 0, 10)));
 
         return back()->with('success', "{$deleted} foto ditolak dan lokasinya dihapus.");
+    }
+
+    /**
+     * Verifikasi foto adalah hak khusus role Admin. Dijaga ulang di sini
+     * (di luar route middleware) supaya tetap aman kalau route-nya diubah.
+     */
+    private function authorizeAdmin(Request $request): void
+    {
+        abort_unless($request->user() && $request->user()->isAdmin(), 403, 'Hak verifikasi foto hanya untuk Admin.');
     }
 
     /** @return array<int, int> */

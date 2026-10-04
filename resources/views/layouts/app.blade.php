@@ -15,6 +15,7 @@
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-192.png') }}">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="{{ asset('css/dark-mode.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
@@ -108,16 +109,7 @@
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.import') }}">Impor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.export') }}">Ekspor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.reviews.index') }}">Moderasi Review</a></li>
-                                <li>
-                                    <a class="dropdown-item d-flex justify-content-between align-items-center gap-3"
-                                       href="{{ route('admin.photo-review.index') }}">
-                                        <span>Verifikasi Foto</span>
-                                        @php($pendingPhotosSuper = \App\Models\Location::awaitingPhotoReview()->count())
-                                        @if ($pendingPhotosSuper > 0)
-                                            <span class="badge bg-warning text-dark">{{ $pendingPhotosSuper }}</span>
-                                        @endif
-                                    </a>
-                                </li>
+                                {{-- Verifikasi Foto tidak ditampilkan di sini: haknya khusus role Admin. --}}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('super-admin.activity-log') }}">Log Aktivitas</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
@@ -251,6 +243,8 @@
                 if (label && l) label.textContent = dark ? l.dark : l.light;
                 if (btn) btn.title = dark ? l ? l.light : 'Light Mode' : l ? l.dark : 'Dark Mode';
                 try { localStorage.setItem(STORE_KEY, theme); } catch (e) {}
+                // Beri tahu komponen yang butuh menyesuaikan (Chart.js, peta, dll).
+                document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: theme } }));
             }
 
             let saved = null;
