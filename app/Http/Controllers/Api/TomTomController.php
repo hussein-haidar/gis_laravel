@@ -113,25 +113,39 @@ class TomTomController extends Controller
         $lngMax = (float) $validated['lng_max'];
         $zoom   = (int) $validated['zoom'];
 
-        // Grid 2x2 di dalam bounds (4 titik, hemat kuota & waktu)
-        $lats = [$latMin, $latMax];
-        $lngs = [$lngMin, $lngMax];
+        // Urutan probe: pusat viewport dulu, baru sudut-sudutnya. Titik sudut pada
+        // viewport yang lebar hampir selalu jatuh di daerah tanpa flow coverage
+        // TomTom (HTTP 400 "Point too far from nearest existing segment"),
+        // sedangkan pusat selalu berada di area yang sedang ditelusuri user.
+        // Pusat diprobe lebih dulu supaya kuota habis pun tetap ada data di
+        // area yang benar-benar dilihat.
+        $probes = [
+            [(($latMin + $latMax) / 2), (($lngMin + $lngMax) / 2)],
+            [$latMin, $lngMin],
+            [$latMin, $lngMax],
+            [$latMax, $lngMin],
+            [$latMax, $lngMax],
+        ];
 
         $segments = [];
         $seen = [];
 
-        foreach ($lats as $lat) {
-            foreach ($lngs as $lng) {
-                $seg = $this->traffic->flowSegmentAt($lat, $lng);
-                if (! $seg) continue;
+        foreach ($probes as [$lat, $lng]) {
+            $seg = $this->traffic->flowSegmentAt($lat, $lng);
+            if (! $seg) {
+                continue;
+            }
 
-                $mid = $seg['midpoint'];
-                $key = round($mid[0], 4) . ',' . round($mid[1], 4);
-                if (isset($seen[$key])) continue;
-                $seen[$key] = true;
-                $segments[] = $seg;
+            $mid = $seg['midpoint'];
+            $key = round($mid[0], 4) . ',' . round($mid[1], 4);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $segments[] = $seg;
 
-                if (count($segments) >= 20) break 2;
+            if (count($segments) >= 20) {
+                break;
             }
         }
 

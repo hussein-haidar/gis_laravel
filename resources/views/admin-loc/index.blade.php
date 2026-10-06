@@ -146,7 +146,7 @@
                        class="btn btn-outline-primary btn-sm">Excel</a>
                     <a href="{{ route('admin.locations.export', ['format' => 'json', 'search' => $search, 'category' => $categoryId]) }}"
                        class="btn btn-outline-info btn-sm">JSON</a>
-                    <a href="{{ route('admin.locations.radius') }}" class="btn btn-outline-warning btn-sm">Cari Radius</a>
+                    <a href="{{ route('locations.radius') }}" class="btn btn-outline-warning btn-sm">Cari Radius</a>
                 </div>
             </form>
         </div>
@@ -234,7 +234,14 @@
             </div>
         </div>
         @if ($locations->hasPages())
-            <div class="card-footer">{{ $locations->links() }}</div>
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                {{-- Info jumlah data --}}
+                <div class="text-muted small">
+                    Menampilkan {{ $locations->firstItem() }} hingga {{ $locations->lastItem() }} dari {{ $locations->total() }} lokasi
+                </div>
+                {{-- Pagination sederhana dengan tombol Prev/Next --}}
+                {{ $locations->links('pagination::bootstrap-4') }}
+            </div>
         @endif
     </div>
 

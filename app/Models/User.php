@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements CanResetPasswordContract
@@ -30,6 +31,34 @@ class User extends Authenticatable implements CanResetPasswordContract
         'password',
         'remember_token',
     ];
+
+    protected $appends = [
+        'avatar_url',
+    ];
+
+    /**
+     * URL avatar siap pakai di HTML, atau null kalau tidak ada.
+     *
+     * Kolom avatar menyimpan dua bentuk berbeda: path relatif di disk public
+     * (hasil unggahan, mis. "avatars/abc123.jpg") dan URL penuh dari Google
+     * OAuth (lh3.googleusercontent.com). URL penuh harus dipakai apa adanya,
+     * kalau tidak asset('storage/'.$path) akan menggabungkan dua URL dan
+     * menghasilkan alamat rusak yang tidak memuat gambar.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (empty($this->avatar)) {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $this->avatar)) {
+            return $this->avatar;
+        }
+
+        return Storage::disk('public')->exists($this->avatar)
+            ? asset('storage/'.$this->avatar)
+            : null;
+    }
 
     protected function casts(): array
     {

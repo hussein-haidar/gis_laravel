@@ -10,6 +10,15 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
+        /* Layer gelap dibangun dari tile OSM lalu di-invert, bukan dari Esri
+           Dark Gray. Esri Dark Gray hanya menyediakan data sampai zoom 16,
+           sehingga di atas itu Esri membalas tile abu-abu bertuliskan
+           "Map data not yet available". OSM tersedia penuh sampai zoom 19.
+           Selector menyasar container layer, bukan tile, karena Leaflet
+           mengabaikan options.className pada TileLayer. */
+        .tile-dark-base .leaflet-tile {
+            filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95) saturate(0.7);
+        }
         .card-body { flex: 1 1 auto; min-height: 0; }
         .location-card {
             cursor: pointer;
@@ -135,6 +144,30 @@
             z-index: 1000; display: flex; gap: 6px;
         }
         .map-toolbar .btn { box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        .map-zoom-info {
+            background: var(--app-surface, rgba(255,255,255,0.94));
+            color: var(--app-text, #111);
+            border: 1px solid var(--app-border, rgba(0,0,0,0.15));
+            border-radius: 8px; padding: 6px 9px; font-size: 11px; line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2); min-width: 138px;
+            margin-bottom: 8px;
+        }
+        .map-zoom-info .zoom-row {
+            display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+        }
+        .map-zoom-info .zoom-pct { font-weight: 700; font-size: 13px; }
+        .map-zoom-info .zoom-bar {
+            position: relative; height: 4px; margin: 5px 0 4px;
+            background: rgba(127,127,127,0.3); border-radius: 2px; overflow: hidden;
+        }
+        .map-zoom-info .zoom-fill {
+            position: absolute; top: 0; bottom: 0; left: 0;
+            background: #2c7be5; border-radius: 2px; transition: width 0.15s ease;
+        }
+        .map-zoom-info .zoom-meta {
+            display: flex; justify-content: space-between; gap: 10px;
+            opacity: 0.7; font-size: 10px;
+        }
         .congestion-icon {
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%; border: 2px solid #fff;
@@ -295,16 +328,33 @@
         const GEOJSON_URL = '{{ url('api/geojson') }}?compact=1' + (location.search ? location.search.replace(/^\?/, '&') : '');
 
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19, attribution: '&copy; OpenStreetMap'
+            maxZoom: 19, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap'
         });
-        const darkTiles = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19, attribution: '&copy; Esri, OpenStreetMap'
-        });
+// Layer gelap = tile OSM + filter invert (lihat CSS .tile-dark-base).
+// Sengaja tidak memakai Esri Dark Gray: tile Esri hanya tersedia
+// sampai zoom 16, dan di atas itu Esri mengembalikan tile abu-abu
+// bertuliskan "Map data not yet available".
+// Catatan: options.className DIABAIKAN oleh L.TileLayer (createTile tidak
+// membacanya), jadi class harus dipasang ke container layer lewat subclass.
+const DarkBaseLayer = L.TileLayer.extend({
+    onAdd: function (map) {
+        L.TileLayer.prototype.onAdd.call(this, map);
+        L.DomUtil.addClass(this._container, 'tile-dark-base');
+    }
+});
+
+const darkTiles = new DarkBaseLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap'
+});
+        // Esri World Imagery punya data sampai zoom 19, tapi cakupannya bolong
+        // di Indonesia (beberapa tile balik jadi placeholder). maxNativeZoom 18
+        // membuat Leaflet menaikkan tile dari zoom 18, jadi tidak pernah
+        // meminta tile 19 yang kosong.
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19, attribution: '&copy; Esri'
+            maxZoom: 19, maxNativeZoom: 18, attribution: '&copy; Esri'
         });
         const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            maxZoom: 17, attribution: '&copy; OpenTopoMap'
+            maxZoom: 17, maxNativeZoom: 17, attribution: '&copy; OpenTopoMap'
         });
 
         const isDarkTheme = function () {
@@ -318,6 +368,9 @@
             layers: [initialBase],
             minZoom: 2,
             maxBounds: [[-85.06, -180], [85.06, 180]],
+            // Leaflet menambah kontrol zoom default di topleft secara otomatis.
+            // Matikan supaya hanya ada satu, di kanan.
+            zoomControl: false,
         }).setView([-2.5489, 118.0149], 5);
         setTimeout(() => map.invalidateSize(), 100);
 
@@ -351,6 +404,49 @@
         };
 
         L.control.scale({ imperial: false }).addTo(map);
+
+// Tombol zoom in/out. Peta ini sebelumnya tidak punya kontrol zoom,
+// jadi satu-satunya cara memperbesar hanya scroll wheel.
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// Indikator level zoom: level, persentase, dan skala 1:x.
+const zoomInfo = L.control({ position: 'bottomleft' });
+zoomInfo.onAdd = function () {
+    this._div = L.DomUtil.create('div', 'map-zoom-info leaflet-control');
+    this._div.innerHTML =
+        '<div class="zoom-row"><span>Zoom</span><span class="zoom-pct">0%</span></div>'
+        + '<div class="zoom-bar"><span class="zoom-fill"></span></div>'
+        + '<div class="zoom-meta"><span class="zoom-level">z0</span><span class="zoom-scale">1:0</span></div>';
+    this._pct = this._div.querySelector('.zoom-pct');
+    this._fill = this._div.querySelector('.zoom-fill');
+    this._level = this._div.querySelector('.zoom-level');
+    this._scale = this._div.querySelector('.zoom-scale');
+    L.DomEvent.disableClickPropagation(this._div);
+    return this._div;
+};
+zoomInfo.addTo(map);
+
+const formatRibuan = function (n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+// Skala 1:x dengan asumsi layar 96 dpi, jadi 1 piksel = 0,264583 mm.
+const updateZoomInfo = function () {
+    const z = map.getZoom();
+    const min = map.getMinZoom();
+    const max = isFinite(map.getMaxZoom()) ? map.getMaxZoom() : 19;
+    const persen = Math.min(100, Math.max(0, Math.round(((z - min) / Math.max(1, max - min)) * 100)));
+    const mpp = 156543.03392 * Math.cos(map.getCenter().lat * Math.PI / 180) / Math.pow(2, z);
+
+    zoomInfo._pct.textContent = persen + '%';
+    zoomInfo._fill.style.width = persen + '%';
+    zoomInfo._level.textContent = 'z' + z + '/' + max;
+    zoomInfo._scale.textContent = '1:' + formatRibuan(Math.round(mpp * 1000 / 0.264583));
+};
+
+updateZoomInfo();
+map.on('zoomend', updateZoomInfo);
+map.on('moveend', updateZoomInfo);
 
         const geocoder = L.Control.Geocoder.nominatim();
         const geocoderControl = L.Control.geocoder({
@@ -515,20 +611,28 @@
 
         const congestionLayer = L.layerGroup();
 
+        // Nama jalan cadangan, dipakai hanya bila jalan Overpass tidak punya
+        // tag "name" atau layer sedang memakai titik cadangan.
         const congestionNames = [
-            'Persimpangan Utama', 'Simpang Macet', 'Jl. Ramai', 'Pusat Kota',
-            'Ruas Jalan PADAT', 'Lingkar Dalam', 'Area Perbelanjaan', 'Jl. Protokol'
+            'Jl. Melati', 'Jl. Anggrek', 'Jl. Kenanga', 'Jl. Mawar',
+            'Jl. Diponegoro', 'Jl. Sudirman', 'Jl. Gatot Subroto',
+            'Jl. Ahmad Yani', 'Jl. Veteran', 'Jl. Pahlawan'
         ];
-        const congestionDescs = {
-            severe: ['Macet parah - jam ramai', 'Sangat padat - hindari area ini', 'Kemacetan tinggi'],
-            moderate: ['Padat - antrean kendaraan', 'Ramai - perlahan', 'Agak macet - hati-hati'],
-            light: ['Lancar - sedikit kendaraan', 'Normal', 'Ringan - tidak ada hambatan']
-        };
 
-        function fetchWithTimeout(url, ms) {
+        // Nomor urut request. Jawaban yang sudah basi diabaikan supaya tidak
+        // menimpa marker yang lebih baru — zoom cepat memicu banyak request
+        // paralel dan responsnya tidak selalu urut.
+        let congestionToken = 0;
+
+        // Opsi fetch (method, headers, body) HARUS diteruskan. Versi sebelumnya
+// hanya menerima (url, ms) sehingga body POST traffic/flow-bounds tidak
+        // pernah terkirim dan TomTom selalu gagal.
+        function fetchWithTimeout(url, ms, options) {
             const controller = new AbortController();
             const timer = setTimeout(function () { controller.abort(); }, ms);
-            return fetch(url, { signal: controller.signal }).finally(function () { clearTimeout(timer); });
+            const opts = Object.assign({}, options || {});
+            opts.signal = controller.signal;
+            return fetch(url, opts).finally(function () { clearTimeout(timer); });
         }
 
         function severityLabel(level) {
@@ -546,7 +650,8 @@
         }
 
         // TomTom flow (server-side, key aman di backend): segmen polyline berwarna.
-        function renderTomTomTraffic(segments) {
+        function renderTomTomTraffic(segments, token) {
+            if (token !== congestionToken) return;
             congestionLayer.clearLayers();
             segments.forEach(function (seg) {
                 const points = seg.points || [];
@@ -561,7 +666,7 @@
 
         const API_BASE = '{{ url('api/v1') }}';
 
-        function loadTomTomTraffic(centerLat, centerLng, zoom) {
+        function loadTomTomTraffic(centerLat, centerLng, zoom, token) {
             const bounds = map.getBounds();
             const url = `${API_BASE}/traffic/flow-bounds`;
             fetchWithTimeout(url, 15000, {
@@ -577,25 +682,27 @@
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
+                    if (token !== congestionToken) return;
                     if (data.status === 'ok' && data.segments && data.segments.length > 0) {
-                        renderTomTomTraffic(data.segments);
+                        renderTomTomTraffic(data.segments, token);
                     } else {
-                        loadSimulatedCongestion(centerLat, centerLng, zoom);
+                        loadSimulatedCongestion(centerLat, centerLng, zoom, token);
                     }
                 })
                 .catch(function () {
-                    loadSimulatedCongestion(centerLat, centerLng, zoom);
+                    loadSimulatedCongestion(centerLat, centerLng, zoom, token);
                 });
         }
 
         // Fallback: titik di atas jalan OSM nyata di area peta saat ini (Overpass),
         // dengan tingkat disesuaikan waktu setempat — bukan koordinat statis Medan.
-        function drawCongestionAt(centerLat, centerLng, point, forcedLevel, nameOverride) {
+        function drawCongestionAt(centerLat, centerLng, point, forcedLevel, nameOverride, token) {
             // GUARD: jangan pernah menggambar titik dengan koordinat NaN —
             // parseFloat(null) = NaN, dan Leaflet akan meletakkannya di [0,0]
             // (Teluk Guinea = laut), yang tampak seperti "titik macet di laut".
             if (!isFinite(point[0]) || !isFinite(point[1]) ||
                 !isFinite(centerLat) || !isFinite(centerLng)) return;
+            if (token !== congestionToken) return;
             const h = new Date().getHours();
             let base;
             if ((h >= 7 && h <= 9) || (h >= 16 && h <= 19)) base = 'severe';
@@ -612,82 +719,85 @@
                 iconSize: congestionIconSizes[level],
                 iconAnchor: congestionIconAnchors[level],
             });
-            const idx = Math.floor(Math.random() * congestionNames.length);
-            const dIdx = Math.floor(Math.random() * congestionDescs[level].length);
-            const name = nameOverride || congestionNames[idx];
-            const desc = congestionDescs[level][dIdx];
+            const name = nameOverride || congestionNames[Math.floor(Math.random() * congestionNames.length)];
             const s = severityLabel(level);
 
+            // Popup hanya nama jalan + status. Teks deskriptif generik
+            // ("Sangat padat - hindari area ini", "Normal") dihapus karena
+            // tidak memberi informasi apa pun tentang lokasi jalan tsb.
             L.marker([point[0], point[1]], { icon: icon })
-                .bindPopup(`<strong>⚠️ ${name}</strong><br><span style="color:${s.color}">${s.text}</span><br>${desc}`)
+                .bindPopup(`<strong>${name}</strong><br><span style="color:${s.color}">${s.text}</span>`)
                 .addTo(congestionLayer);
         }
 
-        function loadSimulatedCongestion(centerLat, centerLng, zoom) {
+        function loadSimulatedCongestion(centerLat, centerLng, zoom, token) {
+            if (token !== congestionToken) return;
             congestionLayer.clearLayers();
 
-            // Ukuran area diskalakan dengan zoom agar peta skala besar (seluruh
-            // Indonesia) tetap terisi, dan mempertajam di zoom tinggi.
-            let d;
-            if (zoom >= 15) d = 0.008;
-            else if (zoom >= 12) d = 0.03;
-            else if (zoom >= 9) d = 0.12;
-            else d = 0.5;
+            // Minta jalan ke proxy server kita sendiri, BUKAN langsung ke
+            // Overpass. Server meng-cache per sel grid, jadi satu area hanya
+            // diambil sekali lalu dipakai bersama semua pengunjung. Ini yang
+            // mencegah Overpass membalas 429 dan memicu titik cadangan acak.
+            const b = map.getBounds();
 
-            const bbox = (centerLat - d) + ',' + (centerLng - d) + ',' + (centerLat + d) + ',' + (centerLng + d);
-            const query =
-                '[out:json][timeout:8];' +
-                `way["highway"~"^(primary|secondary|tertiary|residential|unclassified|service|trunk)$"](${bbox});` +
-                'out center tags 40;';
-
-            const endpoints = [
-                'https://overpass-api.de/api/interpreter',
-                'https://overpass.kumi.systems/api/interpreter'
-            ];
-
-            // Endpoint cadangan Overpass (sering timeout) — coba berurutan.
-            function tryEndpoint(i) {
-                if (i >= endpoints.length) {
-                    // Semua gagal: tempatkan beberapa titik acak di sekitar pusat
-                    // peta supaya layer kemacetan tetap "hidup" walau offline.
-                    placeRandomPoints(centerLat, centerLng);
-                    return;
-                }
-                fetchWithTimeout(endpoints[i] + '?data=' + encodeURIComponent(query), 8000)
-                    .then(function (r) {
-                        if (!r.ok) throw new Error('HTTP ' + r.status);
-                        return r.json();
-                    })
-                    .then(function (data) {
-                        const ways = (data.elements || []).filter(function (e) {
-                            return e.type === 'way' && e.center;
-                        });
-                        if (!ways.length) { placeRandomPoints(centerLat, centerLng); return; }
-
-                        const seen = {};
-                        ways.forEach(function (w) {
-                            const nm = (w.tags && w.tags.name) ? w.tags.name : 'Jalan (tanpa nama)';
-                            if (seen[nm]) return;
-                            seen[nm] = true;
-                            drawCongestionAt(centerLat, centerLng, [w.center.lat, w.center.lon], null, nm);
-                        });
-                    })
-                    .catch(function () { tryEndpoint(i + 1); });
-            }
-            tryEndpoint(0);
+            fetchWithTimeout(API_BASE + '/traffic/roads-bounds', 20000, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({
+                    lat_min: b.getSouth(),
+                    lng_min: b.getWest(),
+                    lat_max: b.getNorth(),
+                    lng_max: b.getEast(),
+                    zoom: zoom,
+                }),
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(function (data) {
+                    if (token !== congestionToken) return;
+                    const roads = data.roads || [];
+                    if (!roads.length) {
+                        placeRandomPoints(centerLat, centerLng, token);
+                        return;
+                    }
+                    roads.forEach(function (road) {
+                        drawCongestionAt(
+                            centerLat, centerLng,
+                            [road.lat, road.lng],
+                            null, road.name, token
+                        );
+                    });
+                })
+                .catch(function () {
+                    if (token !== congestionToken) return;
+                    placeRandomPoints(centerLat, centerLng, token);
+                });
         }
 
-        // Titik acak saat Overpass & TomTom keduanya tidak dapat dijangkau —
-        // supaya toggle kemacetan tidak pernah kosong di area mana pun di peta.
-        function placeRandomPoints(baseLat, baseLng) {
-            const points = [
-                [baseLat + 0.02, baseLng + 0.03, 'severe'],
-                [baseLat - 0.025, baseLng + 0.01, 'moderate'],
-                [baseLat + 0.005, baseLng - 0.025, 'light'],
-                [baseLat - 0.015, baseLng - 0.012, 'moderate'],
+        // Titik cadangan saat Overpass & TomTom tidak dapat dijangkau.
+        // Offset dihitung dari UKURAN VIEWPORT saat ini, bukan konstanta.
+        // Offset lama (0,02-0,03 derajat = 2-3 km) selalu jatuh di luar
+        // layar saat zoom >= 15, sehingga layer tampak kosong padahal
+        // markernya sudah dibuat.
+        function placeRandomPoints(baseLat, baseLng, token) {
+            if (token !== congestionToken) return;
+            const b = map.getBounds();
+            const latSpan = (b.getNorth() - b.getSouth()) * 0.6;
+            const lngSpan = (b.getEast() - b.getWest()) * 0.6;
+            const offsets = [
+                ['severe', 0.35, 0.45],
+                ['moderate', -0.55, 0.22],
+                ['light', 0.15, -0.60],
+                ['moderate', -0.35, -0.30],
             ];
-            points.forEach(function (p) {
-                drawCongestionAt(baseLat, baseLng, [p[0], p[1]], p[2], 'Area ' + p[2].toUpperCase());
+            offsets.forEach(function (p) {
+                drawCongestionAt(
+                    baseLat, baseLng,
+                    [baseLat + latSpan * p[1], baseLng + lngSpan * p[2]],
+                    p[0], null, token
+                );
             });
         }
 
@@ -709,7 +819,7 @@
             lastBoundsKey = key;
 
             const c = map.getCenter();
-            loadTomTomTraffic(c.lat, c.lng, zoom);
+            loadTomTomTraffic(c.lat, c.lng, zoom, ++congestionToken);
         }
 
         overlays['📍 Semua Lokasi'] = locationsLayer;
@@ -1063,7 +1173,21 @@
                 navigator.geolocation.getCurrentPosition(function (pos) {
                     const latlng = [pos.coords.latitude, pos.coords.longitude];
                     map.setView(latlng, 14);
-                    L.marker(latlng).addTo(map)
+                    
+                    // Hapus marker lokasi sebelumnya jika ada
+                    if (window.myLocationMarker) {
+                        map.removeLayer(window.myLocationMarker);
+                    }
+                    
+                    // Buat marker dengan ikon orang (person)
+                    const personIcon = L.divIcon({
+                        className: 'my-location-marker',
+                        html: '<div style="font-size:24px;text-align:center;">🧍‍♂️</div>',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30],
+                    });
+                    
+                    window.myLocationMarker = L.marker(latlng, { icon: personIcon }).addTo(map)
                         .bindPopup('📍 Lokasi Anda').openPopup();
                 }, function () { alert('Gagal mendapatkan lokasi.'); });
             } else { alert('Browser tidak mendukung Geolocation.'); }

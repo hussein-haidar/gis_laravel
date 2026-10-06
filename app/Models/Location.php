@@ -136,11 +136,13 @@ class Location extends Model
             return null;
         }
 
-        // existence dicek lewat disk, bukan file_exists(), supaya konsisten
-        // dengan cleanup dan aman saat disk di-fake pada test.
-        return Storage::disk('public')->exists($this->photo)
-            ? asset('storage/'.$this->photo)
-            : null;
+        // Foto yang sudah disetujui (APPROVED/REJECTED) selalu dikembalikan URL-nya.
+        // Cek keberadaan file di disk DIHAPUSKAN karena:
+        // - Cleanup command sudah men-null-kan path foto yang hilang untuk kategori non-tempat
+        // - Foto yang di-approve harus tetap bisa diakses meski file fisik hilang (mis. cleanup salah klasifikasi)
+        // - Browser akan menampilkan broken image jika file benar-benar hilang, tapi ini lebih
+        //   baik daripada menyembunyikan foto yang seharusnya tampil.
+        return asset('storage/' . $this->photo);
     }
 
     /**

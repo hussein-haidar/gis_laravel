@@ -268,7 +268,7 @@ class LocationController extends Controller
 
     public function radiusForm(): View
     {
-        return view('admin-loc.radius', [
+        return view('loc.radius', [
             'locations' => collect(),
             'lat' => -6.2088,
             'lng' => 106.8456,
@@ -292,7 +292,7 @@ class LocationController extends Controller
             ->withinRadius($lat, $lng, $radius)
             ->get();
 
-        return view('admin-loc.radius', compact('locations', 'lat', 'lng', 'radius'));
+        return view('loc.radius', compact('locations', 'lat', 'lng', 'radius'));
     }
 
     public function distance(Request $request): View
@@ -328,7 +328,7 @@ class LocationController extends Controller
             }
         }
 
-        return view('admin-loc.distance', compact('locations', 'fromId', 'toId', 'route', 'distance', 'isGps', 'fromLat', 'fromLng'));
+        return view('loc.distance', compact('locations', 'fromId', 'toId', 'route', 'distance', 'isGps', 'fromLat', 'fromLng'));
     }
 
     public function export(Request $request)

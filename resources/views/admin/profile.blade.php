@@ -31,8 +31,8 @@
                     @csrf
                     <div class="row mb-4">
                         <div class="col-md-3 text-center">
-                            @if ($user->avatar)
-                                <img src="{{ asset('storage/' . $user->avatar) }}" alt="Avatar" class="rounded-circle border" width="120" height="120" style="object-fit: cover;">
+                            @if ($user->avatar_url)
+                                <img src="{{ $user->avatar_url }}" alt="Avatar" class="rounded-circle border" width="120" height="120" style="object-fit: cover;">
                             @else
                                 <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center text-primary" style="width: 120px; height: 120px;">
                                     <i class="bi bi-person-fill" style="font-size: 3rem;"></i>

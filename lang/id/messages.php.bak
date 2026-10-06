@@ -11,8 +11,6 @@ return [
     'nav_radius_search' => 'Cari Radius',
     'nav_login' => 'Login',
     'nav_logout' => 'Logout',
-    'logout_confirm_title' => 'Konfirmasi Logout',
-    'logout_confirm_message' => 'Apakah Anda yakin ingin keluar?',
     'nav_hello' => 'Halo',
     'language' => 'Bahasa',
     'dark_mode' => 'Mode Gelap',

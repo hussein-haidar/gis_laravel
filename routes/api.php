@@ -23,6 +23,12 @@ Route::get('traffic/flow', [\App\Http\Controllers\Api\TomTomController::class, '
 Route::post('traffic/flow-along', [\App\Http\Controllers\Api\TomTomController::class, 'flowAlong'])->name('traffic.flow-along');
 Route::post('traffic/flow-bounds', [\App\Http\Controllers\Api\TomTomController::class, 'flowBounds'])->name('traffic.flow-bounds');
 
+// Jalan OpenStreetMap via Overpass, di-cache di server supaya tidak
+// membanjiri rate limit Overpass setiap kali user zoom in-out.
+Route::post('traffic/roads-bounds', [\App\Http\Controllers\Api\OverpassController::class, 'bounds'])
+    ->middleware('throttle:60,1')
+    ->name('traffic.roads-bounds');
+
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
 

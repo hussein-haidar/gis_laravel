@@ -53,9 +53,25 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ route('map.index') }}">{{ __('messages.nav_map') }}</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('navigasi.index') }}">{{ __('messages.nav_navigation') }}</a>
-                </li>
+{{-- Menu ini hanya untuk user biasa yang sudah login. Admin & Super
+                     Admin bekerja lewat menu dropdown role-nya. Route navigasi
+                     juga berada di middleware auth, jadi tamu tidak boleh
+                     melihat tautan ini. --}}
+                    @if (Auth::check() && ! Auth::user()->hasRole('admin', 'super_admin'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('navigasi.index') }}">{{ __('messages.nav_navigation') }}</a>
+                        </li>
+                        {{-- Alat bantu perjalanan untuk pengunjung. Favorit &
+                             Riwayat tidak diulang di sini karena sudah ada
+                             sebagai menu utama navbar. --}}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ __('messages.nav_tools') }}</a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ route('pengunjung.locations.distance') }}">{{ __('messages.nav_distance_calculator') }}</a></li>
+                                <li><a class="dropdown-item" href="{{ route('pengunjung.locations.radius') }}">{{ __('messages.nav_radius_search') }}</a></li>
+                            </ul>
+                        </li>
+                    @endif
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ __('messages.language') }}">🌐 {{ strtoupper(app()->getLocale()) }}</a>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -84,35 +100,33 @@
                             <li><a class="dropdown-item text-primary small" href="{{ route('notifications.index') }}">{{ __('messages.notification_view_all') }}</a></li>
                         </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('history.index') }}">{{ __('messages.nav_history') }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('favorites.index') }}">{{ __('messages.nav_favorites') }}</a>
-                    </li>
+                    {{-- "Riwayat Perjalanan" adalah data milik pengunjung, bukan
+                         tugas Super Admin. --}}
+                    @if (! Auth::user()->hasRole('super_admin'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('history.index') }}">{{ __('messages.nav_history') }}</a>
+                        </li>
+                    @endif
+                    @if (! Auth::user()->hasRole('super_admin'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('favorites.index') }}">{{ __('messages.nav_favorites') }}</a>
+                        </li>
+                    @endif
                     @if (Auth::user()->hasRole('super_admin'))
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Super Admin</a>
+                            {{-- Super Admin = supervisi & konfigurasi situs.
+                                 Semua fitur operasional (lokasi, impor/ekspor,
+                                 moderasi review, verifikasi foto, Kalkulator Jarak,
+                                 Cari Radius, Pengaturan) adalah tugas role Admin dan
+                                 route-nya juga 403 untuk Super Admin. --}}
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{{ route('super-admin.dashboard') }}">Dashboard</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.dashboard') }}">Dashboard Statistik</a></li>
-                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('super-admin.users.index') }}">Kelola User</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.index') }}">Kelola Lokasi</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.create') }}">Tambah Lokasi</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.categories.index') }}">Kelola Kategori</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.distance') }}">Kalkulator Jarak</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.radius') }}">Cari Radius</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.import') }}">Impor Data</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.export') }}">Ekspor Data</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.reviews.index') }}">Moderasi Review</a></li>
-                                {{-- Verifikasi Foto tidak ditampilkan di sini: haknya khusus role Admin. --}}
-                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('super-admin.activity-log') }}">Log Aktivitas</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
+                                <li><a class="dropdown-item" href="{{ route('admin.visit-history.index') }}">Riwayat Kunjungan</a></li>
+                                <li><a class="dropdown-item" href="{{ route('super-admin.web') }}">Kelola Web</a></li>
                                 {{-- Profil dan Ganti Password tidak ada di sini: keduanya
                                      sudah ada di dropdown user (avatar + nama) di navbar. --}}
                             </ul>
@@ -126,8 +140,8 @@
                                 <li><a class="dropdown-item" href="{{ route('admin.categories.index') }}">Kelola Kategori</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.users.index') }}">Kelola User</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.distance') }}">Kalkulator Jarak</a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.locations.radius') }}">Cari Radius</a></li>
+                                <li><a class="dropdown-item" href="{{ route('locations.distance') }}">Kalkulator Jarak</a></li>
+                                <li><a class="dropdown-item" href="{{ route('locations.radius') }}">Cari Radius</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.import') }}">Impor Data</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.locations.export') }}">Ekspor Data</a></li>
@@ -145,6 +159,7 @@
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ route('admin.visit-history.index') }}">Riwayat Kunjungan</a></li>
                                 <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">Pengaturan</a></li>
                                 {{-- Profil dan Ganti Password tidak ada di sini: keduanya
                                      sudah ada di dropdown user (avatar + nama) di navbar. --}}
@@ -154,7 +169,7 @@
                     @php
     // Tautan profil & ganti password selalu lewat route generik (/profil)
     // supaya navbar sama untuk Admin, Super Admin, dan User.
-    $avatarPath = Auth::user()->avatar ? asset('storage/'.Auth::user()->avatar) : null;
+    $avatarPath = Auth::user()->avatar_url;
     $inisial = collect(preg_split('/\s+/', trim(Auth::user()->name)))
         ->filter()
         ->take(2)
@@ -198,12 +213,9 @@
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <form action="{{ route('logout') }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="dropdown-item text-danger">
-                                        <i class="bi bi-box-arrow-right me-2"></i> {{ __('messages.nav_logout') }}
-                                    </button>
-                                </form>
+                                <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
+                                    <i class="bi bi-box-arrow-right me-2"></i> {{ __('messages.nav_logout') }}
+                                </a>
                             </li>
                         </ul>
                     </li>
@@ -400,9 +412,33 @@
         @endauth
     </script>
 
-    @include('partials.chat-widget')
 
     @stack('scripts')
+@yield('scripts')
+
+<!-- Logout Confirmation Modal -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="logoutModalLabel">{{ __('messages.logout_confirm_title') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>{{ __('messages.logout_confirm_message') }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('messages.cancel') }}</button>
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="btn btn-danger">{{ __('messages.nav_logout') }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@stack('scripts')
 @yield('scripts')
 </body>
 </html>

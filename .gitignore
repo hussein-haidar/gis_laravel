@@ -3,6 +3,9 @@
 .env
 .env.backup
 .env.production
+.env.local.backup
+# Salinan .env untuk upload manual ke cPanel (berisi kredensial produksi)
+.env.txt
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -26,3 +29,10 @@ Thumbs.db
 
 # Kredensial akun lokal (jangan di-commit)
 /AKUN_LOGIN.md
+
+# Dump database (berisi data produksi, jangan di-commit)
+/database/backups
+*.sql
+
+# Arsip upload/download, jangan ikut ter-deploy
+*.zip

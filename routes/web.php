@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\PhotoReviewController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\WebSettingController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\FavoriteController;
@@ -93,23 +94,14 @@ Route::middleware(['auth', 'role:super_admin'])->prefix('super-admin')->name('su
     Route::resource('users', UserController::class)->except(['show']);
     Route::get('activity-log', [ActivityLogController::class, 'index'])->name('activity-log');
 
-    // Super Admin juga punya akses semua fitur Admin
-    Route::prefix('locations')->name('locations.')->group(function () {
-        Route::get('/', [LocationController::class, 'index'])->name('index');
-        Route::get('create', [LocationController::class, 'create'])->name('create');
-        Route::post('/', [LocationController::class, 'store'])->name('store');
-        Route::get('{location}/edit', [LocationController::class, 'edit'])->name('edit');
-        Route::put('{location}', [LocationController::class, 'update'])->name('update');
-        Route::delete('{location}', [LocationController::class, 'destroy'])->name('destroy');
-        Route::post('bulk-delete', [LocationController::class, 'bulkDelete'])->name('bulk-delete');
-        Route::get('jarak', [LocationController::class, 'distance'])->name('distance');
-        Route::get('radius', [LocationController::class, 'radiusForm'])->name('radius');
-        Route::post('radius', [LocationController::class, 'radiusSearch'])->name('radius.search');
-        Route::get('ekspor', [LocationController::class, 'export'])->name('export');
-        Route::get('impor', [LocationController::class, 'importForm'])->name('import');
-        Route::post('impor', [LocationController::class, 'import'])->name('import.store');
-        Route::get('template', [LocationController::class, 'template'])->name('template');
-    });
+    // Kelola Web: judul & deskripsi situs, banner, dan pengumuman.
+    Route::get('web', [WebSettingController::class, 'index'])->name('web');
+    Route::put('web', [WebSettingController::class, 'update'])->name('web.update');
+
+    //Super Admin TIDAK punya route /super-admin/locations (CRUD, impor,
+    // ekspor, template). Duplikat itu dulu membuat Super Admin bisa mengelola
+    // lokasi lewat URL walau menunya disembunyikan. Sekarang pengelolaan
+    // lokasi adalah tugas khusus role Admin.
 });
 
 // ── Admin Routes ─────────────────────────────────────────────────────────────
@@ -128,35 +120,65 @@ Route::middleware(['auth', 'role:admin,super_admin'])->prefix('admin')->name('ad
 
     Route::resource('locations', LocationController::class)->except(['show']);
     Route::post('locations/bulk-delete', [LocationController::class, 'bulkDelete'])->name('locations.bulk-delete');
-    Route::get('locations/jarak', [LocationController::class, 'distance'])->name('locations.distance');
-    Route::get('locations/radius', [LocationController::class, 'radiusForm'])->name('locations.radius');
-    Route::post('locations/radius', [LocationController::class, 'radiusSearch'])->name('locations.radius.search');
+// Riwayat kunjungan & navigasi seluruh pengguna (bukan riwayat pribadi).
+    Route::get('visit-history', [App\Http\Controllers\Admin\VisitHistoryController::class, 'index'])->name('visit-history.index');
+
+    Route::resource('users', App\Http\Controllers\Admin\UserController::class)->except(['show']);
+});
+
+// ── Fitur operasional HANYA untuk role Admin ─────────────────────────────────
+// Super Admin sengaja dikecualikan dari semua route di bawah. Ini bukan sekadar
+// soal menu: tanpa pemisahan middleware, Super Admin masih bisa mencapai
+// /admin/locations atau /admin/reviews lewat URL dan menjalankan operasi yang
+// seharusnya milik tim operasional.
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    // Verifikasi foto lokasi: foto hasil fetch tidak tayang sebelum disetujui.
+    Route::get('photo-review', [PhotoReviewController::class, 'index'])->name('photo-review.index');
+    Route::post('photo-review/approve', [PhotoReviewController::class, 'approve'])->name('photo-review.approve');
+    Route::post('photo-review/reject', [PhotoReviewController::class, 'reject'])->name('photo-review.reject');
+    Route::post('photo-review/approve-all', [PhotoReviewController::class, 'approveAll'])->name('photo-review.approve-all');
+
+    // Pengelolaan lokasi.
+    Route::resource('locations', LocationController::class)->except(['show']);
+    Route::post('locations/bulk-delete', [LocationController::class, 'bulkDelete'])->name('locations.bulk-delete');
     Route::get('locations/ekspor', [LocationController::class, 'export'])->name('locations.export');
     Route::get('locations/impor', [LocationController::class, 'importForm'])->name('locations.import');
     Route::post('locations/impor', [LocationController::class, 'import'])->name('locations.import.store');
     Route::get('locations/template', [LocationController::class, 'template'])->name('locations.template');
     Route::post('locations/sync', [LocationController::class, 'sync'])->name('locations.sync');
 
+    // Kalkulator Jarak & Cari Radius TIDAK dideklarasikan di sini. Route-nya
+    // ada di grup role:admin,user di bawah file ini — middleware sana sudah
+    // mencakup Admin, jadi menyalinnya ke sini hanya menghasilkan nama route
+    // ganda yang diam-diam menimpa yang lain.
+
+    // Kategori.
     Route::get('categories/provinsi', [CategoryController::class, 'provinces'])->name('categories.provinsi');
     Route::resource('categories', CategoryController::class)->except(['show']);
 
-    Route::resource('users', App\Http\Controllers\Admin\UserController::class)->except(['show']);
-
+    // Moderasi ulasan.
     Route::get('reviews', [App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');
     Route::post('reviews/{review}/moderate', [App\Http\Controllers\Admin\ReviewController::class, 'moderate'])->name('reviews.moderate');
     Route::delete('reviews/{review}', [App\Http\Controllers\Admin\ReviewController::class, 'destroy'])->name('reviews.destroy');
 
+    // Pengaturan aplikasi (API key, routing, traffic, asisten AI).
     Route::get('pengaturan', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('pengaturan/tes-key', [SettingsController::class, 'testKey'])->name('settings.test-key');
     Route::put('pengaturan', [SettingsController::class, 'update'])->name('settings.update');
 });
 
-// Verifikasi foto lokasi HANYA untuk role Admin. Super Admin sengaja
-// dikecualikan: persetujuan foto adalah tugas operasional harian admin,
-// sedangkan super admin fokus ke user, role, dan log aktivitas.
-Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('photo-review', [PhotoReviewController::class, 'index'])->name('photo-review.index');
-    Route::post('photo-review/approve', [PhotoReviewController::class, 'approve'])->name('photo-review.approve');
-    Route::post('photo-review/reject', [PhotoReviewController::class, 'reject'])->name('photo-review.reject');
-    Route::post('photo-review/approve-all', [PhotoReviewController::class, 'approveAll'])->name('photo-review.approve-all');
+// ── Pengunjung Routes (Visitor) ────────────────────────────────────────────────
+// Prefix 'pengunjung' untuk halaman yang diakses pengunjung (role user).
+Route::middleware(['auth', 'role:user'])->prefix('pengunjung')->name('pengunjung.')->group(function () {
+    Route::get('locations/jarak', [LocationController::class, 'distance'])->name('locations.distance');
+    Route::get('locations/radius', [LocationController::class, 'radiusForm'])->name('locations.radius');
+    Route::post('locations/radius', [LocationController::class, 'radiusSearch'])->name('locations.radius.search');
+});
+
+// Kalkulator Jarak & Cari Radius untuk Admin (tanpa prefix pengunjung).
+// Super Admin dikecualikan.
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('locations/jarak', [LocationController::class, 'distance'])->name('locations.distance');
+    Route::get('locations/radius', [LocationController::class, 'radiusForm'])->name('locations.radius');
+    Route::post('locations/radius', [LocationController::class, 'radiusSearch'])->name('locations.radius.search');
 });

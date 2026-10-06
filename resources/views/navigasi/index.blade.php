@@ -30,7 +30,16 @@
             padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px;
         }
         .suggestion-item:hover { background: #f1f5f9; }
-        .traffic-badge { cursor: default; }
+        /* Daftar titik macet: tinggi dibatasi supaya tidak mendorong peta. */
+        .traffic-list { max-height: 230px; overflow-y: auto; }
+        .traffic-list-item {
+            display: flex; align-items: flex-start; gap: 6px;
+            padding: 5px 6px; border-radius: 6px; cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+        .traffic-list-item:hover { background: #f1f5f9; }
+        .traffic-list-item .tl-name { font-weight: 600; font-size: .82rem; line-height: 1.2; }
+        .traffic-list-item .tl-meta { font-size: .7rem; color: #6b7280; line-height: 1.2; }
         #instructions-list { max-height: 200px; overflow-y: auto; }
         #instructions-list .ins-item {
             display: flex; align-items: center; gap: 8px;
@@ -190,7 +199,6 @@
             <button class="btn btn-outline-secondary btn-sm" onclick="history.back()" title="{{ __('messages.back') }}">← {{ __('messages.back') }}</button>
             <h1 class="h3 mb-0">🧭 {{ __('messages.navigasi_title') }}</h1>
         </div>
-        <span class="badge traffic-badge text-white" id="traffic-badge" style="background:#6b7280;">{{ __('messages.traffic_loading') }}</span>
     </div>
 
     <div class="row g-3">
@@ -260,6 +268,17 @@
                 <div class="small d-none mb-2" id="res-congestion">
                     <div class="fw-bold small mb-1">🚦 {{ __('messages.traffic_along_route') }}</div>
                     <div id="res-congestion-list"></div>
+                </div>
+                {{-- Daftar titik macet real (TomTom flow) di seluruh area peta.
+                     Berbeda dari #res-congestion yang hanyaSegments sepanjang rute. --}}
+                <div class="mb-2">
+                    <div class="fw-bold small mb-1 d-flex justify-content-between align-items-center">
+                        <span>📍 {{ __('messages.traffic_points_area') }}</span>
+                        <span class="badge text-bg-secondary" id="traffic-list-count">—</span>
+                    </div>
+                    <div id="traffic-list" class="traffic-list">
+                        <div class="text-muted small">{{ __('messages.loading') }}</div>
+                    </div>
                 </div>
                 <div class="alert alert-danger py-1 px-2 small d-none" id="res-jam" role="alert">
                     🔴 <strong>{{ __('messages.traffic_severe_detected') }}</strong>
@@ -407,9 +426,8 @@
                 const res = await fetch(API_BASE + '/routing/config');
                 const data = await res.json();
                 renderVehicleButtons(data.vehicles);
-                renderTraffic(data.traffic);
             } catch (e) {
-                document.getElementById('traffic-badge').textContent = 'Status: Gagal';
+                // Status lalu lintas tidak lagi ditampilkan sebagai badge.
             }
         }
 
@@ -473,14 +491,6 @@
             document.getElementById('vehicle-label').textContent = v.icon + ' ' + v.label + (heavy
                 ? ' — rute dijauhkan dari jalan kecil (gang/lingkungan) & otomatis menghindari jembatan rendah.'
                 : ' — avatar di peta memakai ikon kendaraan ini; jembatan rendah tidak menghalangi.');
-        }
-
-        function renderTraffic(t) {
-            const badge = document.getElementById('traffic-badge');
-            const mapColor = { rush: '#dc2626', mid: '#f59e0b', low: '#16a34a' };
-            const mapEmoji = { rush: '🔴', mid: '🟠', low: '🟢' };
-            badge.textContent = mapEmoji[t.level] + ' Lalu lintas: ' + t.label;
-            badge.style.background = mapColor[t.level] || '#6b7280';
         }
 
         // ── Autocomplete lokasi ────────────────────────────────────────────────
@@ -858,10 +868,130 @@
             if (now - lastAroundLoad < 20000) return;
             if (routeGeometry.length) return; // rute sudah ada → pakai segmen sepanjang rute
             lastAroundLoad = now;
-            const d = 0.012;
-            loadTrafficAlongRoute([
-                [lat - d, lng], [lat, lng - d], [lat, lng], [lat, lng + d], [lat + d, lng]
-            ]);
+            loadTrafficViewport();
+        }
+
+        // ── Kemacetan seluruh area peta (bukan hanya rute) ───────────────────
+        // Token anti-race: respons lama tidak boleh menimpa viewport baru.
+        let congestionToken = 0;
+        let viewportTimer = null;
+
+        function fetchWithTimeout(url, ms, options) {
+            const controller = new AbortController();
+            const timer = setTimeout(function () { controller.abort(); }, ms);
+            const opts = Object.assign({}, options || {});
+            opts.signal = controller.signal;
+            return fetch(url, opts).finally(function () { clearTimeout(timer); });
+        }
+
+        function scheduleViewportTraffic() {
+            clearTimeout(viewportTimer);
+            viewportTimer = setTimeout(loadTrafficViewport, 600);
+        }
+
+        // Minta titik macet di seluruh viewport yang sedang dilihat. Titik
+        // berasal dari TomTom flow sehingga berada di jalan sungguhan, bukan
+        // koordinat tebakan.
+        function loadTrafficViewport() {
+            if (routeGeometry.length) return; // rute aktif → fokus ke segmen rute
+            if (!map) return;
+
+            const b = map.getBounds();
+            const token = ++congestionToken;
+            const badge = document.getElementById('traffic-badge-map');
+            if (badge) {
+                badge.textContent = '🚦 Mencari kemacetan di area ini...';
+                badge.style.display = 'block';
+            }
+
+            fetchWithTimeout(API_BASE + '/traffic/flow-bounds', 15000, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({
+                    lat_min: b.getSouth(),
+                    lng_min: b.getWest(),
+                    lat_max: b.getNorth(),
+                    lng_max: b.getEast(),
+                    zoom: map.getZoom(),
+                }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (json) {
+                    if (token !== congestionToken) return;
+                    renderTrafficSegments(json && json.status === 'ok' ? (json.segments || []) : []);
+                })
+                .catch(function () {
+                    if (token !== congestionToken) return;
+                    renderTrafficSegments([]);
+                });
+        }
+
+        // Daftar titik macet siap klik (zoom ke lokasi). Berlaku untuk mode
+        // viewport maupun mode rute, sehingga panel ini selalu terisi begitu
+        // ada data dari TomTom.
+        function renderTrafficList(segments) {
+            const box = document.getElementById('traffic-list');
+            const count = document.getElementById('traffic-list-count');
+            if (!box) return;
+
+            const levels = {
+                severe: { icon: '🔴', label: 'Macet parah', color: '#e60000' },
+                moderate: { icon: '🟠', label: 'Padat', color: '#e6b800' },
+                ramai: { icon: '🔵', label: 'Ramai', color: '#60a5fa' },
+                light: { icon: '🟢', label: 'Lancar', color: '#16a34a' },
+            };
+
+            const rows = [];
+            (segments || []).forEach(function (seg) {
+                const pts = seg.points || [];
+                if (pts.length < 2) return;
+                const lvl = colorLvl(seg.color);
+                const mid = pts[Math.floor(pts.length / 2)];
+                if (!isFinite(mid[0]) || !isFinite(mid[1])) return;
+                rows.push({
+                    lvl: lvl,
+                    street: seg.street || 'Ruas jalan',
+                    speed: seg.currentSpeed,
+                    free: seg.freeFlowSpeed,
+                    len: segLenKm(pts),
+                    lat: mid[0],
+                    lng: mid[1],
+                });
+            });
+
+            const order = { severe: 0, moderate: 1, ramai: 2, light: 3 };
+            rows.sort(function (a, b) { return order[a.lvl] - order[b.lvl]; });
+
+            if (count) count.textContent = rows.length ? rows.length + ' titik' : '0';
+
+            if (!rows.length) {
+                box.innerHTML = '<div class="text-muted small">Belum ada data kemacetan untuk area ini.</div>';
+                return;
+            }
+
+            box.innerHTML = '';
+            rows.forEach(function (r) {
+                const meta = levels[r.lvl].label;
+                const speed = (r.speed || r.free)
+                    ? ' • ' + Math.round(r.speed || 0) + '/' + Math.round(r.free || 0) + ' km/jam'
+                    : '';
+                const len = r.len ? ' • ±' + r.len.toFixed(1) + ' km' : '';
+
+                const item = document.createElement('div');
+                item.className = 'traffic-list-item';
+                item.style.borderLeftColor = levels[r.lvl].color;
+                item.title = 'Klik untuk zoom ke lokasi ini';
+                item.innerHTML =
+                    '<span>' + levels[r.lvl].icon + '</span>'
+                    + '<span><span class="tl-name">' + r.street + '</span>'
+                    + '<span class="tl-meta">' + meta + speed + len + '</span></span>';
+
+                item.addEventListener('click', function () {
+                    map.setView([r.lat, r.lng], Math.max(map.getZoom(), 15));
+                });
+
+                box.appendChild(item);
+            });
         }
 
         function renderTrafficSegments(segments) {
@@ -907,7 +1037,9 @@
                 if (segments.length) {
                     badge.textContent = '🚦 Kemacetan real-time: ' + segments.length + ' segmen, ' + severeSegments.length + ' parah';
                 } else {
-                    badge.textContent = '🚦 Tidak ada data kemacetan di rute.';
+                    badge.textContent = routeGeometry.length
+                        ? '🚦 Tidak ada data kemacetan di rute.'
+                        : '🚦 Tidak ada data kemacetan di area ini.';
                 }
                 badge.style.display = 'block';
             }
@@ -922,6 +1054,7 @@
 
             recolorRoute(segments);
             buildCongestionSummary(segments);
+            renderTrafficList(segments);
             updateResStatus();
 
             checkRouteJam();
@@ -1443,6 +1576,9 @@
             document.getElementById('traffic-legend').style.display = 'none';
             const badge = document.getElementById('traffic-badge-map');
             if (badge) badge.style.display = 'none';
+            // Rute dihapus → kembalikan daftar titik macet area peta.
+            renderTrafficList([]);
+            scheduleViewportTraffic();
             hideReroutePopup();
         });
 
@@ -1502,10 +1638,19 @@
         });
 
         map.on('moveend', function () {
-            if (!routeGeometry.length && map.getZoom() >= 11) {
-                const c = map.getCenter();
-                loadTrafficAround(c.lat, c.lng);
+            if (!routeGeometry.length) {
+                // Muat titik macet di seluruh area yang sedang dilihat, bukan
+                // hanya di sekitar titik tengah.
+                scheduleViewportTraffic();
             }
         });
+
+        map.on('zoomend', function () {
+            if (!routeGeometry.length) scheduleViewportTraffic();
+        });
+
+        // Muat pertama kali supaya daftar titik macet tidak kosong walau user
+        // belum menjalankan pencarian rute.
+        scheduleViewportTraffic();
     </script>
 @endsection

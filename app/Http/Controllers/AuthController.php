@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Auth\Events\PasswordReset;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -55,8 +57,29 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $userRole = Role::where('name', 'user')->first();
+        $userRoleName = $request->role ?? 'user';
+        $userRole = Role::where('name', $userRoleName)->firstOrFail();
 
+        // For admin/superadmin registration, create pending account for approval
+        if ($userRoleName === 'admin' || $userRoleName === 'super_admin') {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role_id' => $userRole->id,
+                'is_pending' => true,
+            ]);
+
+            // Notify superadmin/admin for approval
+            $notifiable = $userRoleName === 'admin' ? auth()->user() : auth()->user();
+            if ($notifiable) {
+                $notifiable->notify(new \App\Notifications\NewAdminRegistration($user, auth()->user()));
+            }
+
+            return back()->with('info', 'Permintaan pendaftaran admin baru telah dikirim ke superadmin/admin untuk diverifikasi.');
+        }
+
+        // Regular user registration
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
@@ -87,10 +110,17 @@ class AuthController extends Controller
         if (! $user) {
             $user = User::where('email', $googleUser->getEmail())->first();
 
+            // Download avatar Google & simpan lokal
+            $avatarPath = $this->downloadAndStoreGoogleAvatar($googleUser->getAvatar());
+
             if ($user) {
                 $user->update([
                     'google_id' => $googleUser->getId(),
-                    'avatar' => $googleUser->getAvatar(),
+                    // Foto profil milik user sendiri tidak boleh ditimpa foto
+                    // Google: Google hanya jadi sumber awal. avatar_url null
+                    // berarti kolom kosong ATAU berkas uploadnya sudah hilang,
+                    // dan dua-duanya layak diisi ulang dari Google.
+                    'avatar' => $user->avatar_url ?: $avatarPath,
                 ]);
             } else {
                 $userRole = Role::where('name', 'user')->first();
@@ -98,7 +128,7 @@ class AuthController extends Controller
                     'name' => $googleUser->getName() ?? $googleUser->getEmail(),
                     'email' => $googleUser->getEmail(),
                     'google_id' => $googleUser->getId(),
-                    'avatar' => $googleUser->getAvatar(),
+                    'avatar' => $avatarPath,
                     'password' => Hash::make(\Str::random(24)),
                     'role_id' => $userRole->id,
                 ]);
@@ -108,6 +138,45 @@ class AuthController extends Controller
         Auth::login($user, true);
 
         return redirect()->intended(route('map.index'));
+    }
+
+    /**
+     * Download avatar dari Google & simpan ke storage/app/public/avatars/
+     * Supaya foto tidak bergantung pada URL temporary Google.
+     */
+    protected function downloadAndStoreGoogleAvatar(?string $avatarUrl): ?string
+    {
+        if (empty($avatarUrl)) {
+            return null;
+        }
+
+        try {
+            $client = new \GuzzleHttp\Client(['timeout' => 10]);
+            $response = $client->get($avatarUrl);
+
+            if ($response->getStatusCode() !== 200) {
+                return null;
+            }
+
+            $content = $response->getBody()->getContents();
+            $mimeType = $response->getHeaderLine('Content-Type');
+            $extension = match (true) {
+                str_starts_with($mimeType, 'image/jpeg') => 'jpg',
+                str_starts_with($mimeType, 'image/png') => 'png',
+                str_starts_with($mimeType, 'image/webp') => 'webp',
+                default => 'jpg',
+            };
+
+            $filename = 'google_' . Str::random(16) . '.' . $extension;
+            $path = 'avatars/' . $filename;
+
+            Storage::disk('public')->put($path, $content);
+
+            return $path;
+        } catch (\Exception $e) {
+            // Gagal download → return null, fallback ke default
+            return null;
+        }
     }
 
     public function logout(Request $request)

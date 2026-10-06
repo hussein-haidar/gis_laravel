@@ -167,9 +167,16 @@
                     </table>
                 </div>
             </div>
-            @if ($photos->hasPages())
-                <div class="card-body">{{ $photos->links() }}</div>
-            @endif
+@if ($photos->hasPages())
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                {{-- Info jumlah data --}}
+                <div class="text-muted small">
+                    Menampilkan {{ $photos->firstItem() }} hingga {{ $photos->lastItem() }} dari {{ $photos->total() }} foto
+                </div>
+                {{-- Pagination sederhana dengan tombol Prev/Next --}}
+                {{ $photos->links('pagination::bootstrap-4') }}
+            </div>
+        @endif
         </div>
     </form>
 @endsection

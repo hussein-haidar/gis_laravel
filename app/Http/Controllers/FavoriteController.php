@@ -10,15 +10,24 @@ use Illuminate\View\View;
 
 class FavoriteController extends Controller
 {
-    public function index(Request $request): View
+public function index(Request $request): View
     {
-        $favorites = Favorite::with('location.category')
-            ->where('user_id', $request->user()->id)
-            // Lokasi yang fotonya belum disetujui tidak tampil di daftar
-            // favorit supaya tidak membocorkan nama yang seharusnya disembunyikan.
-            ->whereHas('location', fn ($q) => $q->publiclyVisible())
-            ->orderByDesc('created_at')
-            ->paginate(12);
+        $user = $request->user();
+
+        // Super admin bisa melihat favorit semua user
+        if ($user->hasRole('super_admin')) {
+            $favorites = Favorite::with('location.category')
+                ->whereHas('location', fn ($q) => $q->publiclyVisible())
+                ->orderByDesc('created_at')
+                ->paginate(12);
+        } else {
+            // Admin dan user biasa hanya melihat favorit themselves
+            $favorites = Favorite::with('location.category')
+                ->where('user_id', $user->id)
+                ->whereHas('location', fn ($q) => $q->publiclyVisible())
+                ->orderByDesc('created_at')
+                ->paginate(12);
+        }
 
         return view('favorites.index', compact('favorites'));
     }
