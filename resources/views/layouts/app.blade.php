@@ -438,6 +438,125 @@
     </div>
 </div>
 
+@auth
+<div class="modal fade" id="idleLogoutModal" tabindex="-1" aria-labelledby="idleLogoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="idleLogoutModalLabel">
+                    <i class="bi bi-hourglass-split me-2"></i>{{ __('messages.idle_logout_title') }}
+                </h5>
+            </div>
+            <div class="modal-body text-center">
+                <p class="mb-3">{{ __('messages.idle_logout_message') }}</p>
+                <div class="display-5 fw-bold text-danger"><span id="idleCountdown">60</span><small class="fs-6">s</small></div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" id="idleStayBtn">
+                    <i class="bi bi-person-check me-1"></i>{{ __('messages.idle_stay') }}
+                </button>
+                <button type="button" class="btn btn-danger" id="idleLogoutBtn">
+                    <i class="bi bi-box-arrow-right me-1"></i>{{ __('messages.idle_logout_now') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modalEl = document.getElementById('idleLogoutModal');
+    if (!modalEl || typeof bootstrap === 'undefined') { return; }
+
+    var IDLE_WARNING_MS = 5 * 60 * 1000;
+    var COUNTDOWN_SECONDS = 60;
+    var logoutUrl = '{{ route('logout') }}';
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+    var countdownEl = document.getElementById('idleCountdown');
+    var lastActivityAt = Date.now();
+    var warnAt = lastActivityAt + IDLE_WARNING_MS;
+    var logoutAt = warnAt + COUNTDOWN_SECONDS * 1000;
+    var warningShown = false;
+    var loggingOut = false;
+
+    function performLogout() {
+        if (loggingOut) { return; }
+        loggingOut = true;
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = logoutUrl;
+        var token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = '_token';
+        token.value = csrfMeta ? csrfMeta.getAttribute('content') : '';
+        form.appendChild(token);
+        var idle = document.createElement('input');
+        idle.type = 'hidden';
+        idle.name = 'idle';
+        idle.value = '1';
+        form.appendChild(idle);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function hideWarning() {
+        warningShown = false;
+        if (modalEl.classList.contains('show')) { modal.hide(); }
+    }
+
+    function check() {
+        if (loggingOut) { return; }
+        var now = Date.now();
+        if (now < warnAt) {
+            hideWarning();
+            return;
+        }
+        if (!warningShown) {
+            warningShown = true;
+            modal.show();
+        }
+        var remaining = Math.ceil((logoutAt - now) / 1000);
+        if (countdownEl) { countdownEl.textContent = Math.max(0, remaining); }
+        if (now >= logoutAt) { performLogout(); }
+    }
+
+    function resetTimers() {
+        if (loggingOut) { return; }
+        lastActivityAt = Date.now();
+        warnAt = lastActivityAt + IDLE_WARNING_MS;
+        logoutAt = warnAt + COUNTDOWN_SECONDS * 1000;
+        hideWarning();
+        check();
+    }
+
+    var lastResetAt = 0;
+    function onActivity() {
+        var now = Date.now();
+        if (now - lastResetAt < 1000) { return; }
+        lastResetAt = now;
+        resetTimers();
+    }
+
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'].forEach(function (evt) {
+        window.addEventListener(evt, onActivity, { passive: true });
+    });
+
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+
+    document.getElementById('idleStayBtn').addEventListener('click', function () {
+        lastResetAt = Date.now();
+        resetTimers();
+    });
+    document.getElementById('idleLogoutBtn').addEventListener('click', performLogout);
+
+    setInterval(check, 1000);
+    check();
+})();
+</script>
+@endauth
+
 @stack('scripts')
 @yield('scripts')
 </body>

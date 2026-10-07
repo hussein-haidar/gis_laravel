@@ -17,6 +17,10 @@
 
     <div class="card shadow-sm">
         <div class="card-body p-4">
+            @if (session('status'))
+                <div class="alert alert-info">{{ session('status') }}</div>
+            @endif
+
             @if ($errors->any())
                 <div class="alert alert-danger">
                     @foreach ($errors->all() as $error)

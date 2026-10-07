@@ -477,9 +477,221 @@ hr {
     color: #e5e7eb;
 }
 
-/* ── Routing & geocoder panels ── */
+/* ── Improved dark mode depth & aesthetics ── */
+:root[data-theme="dark"] {
+    --app-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
+    --app-surface: #1a1d24;
+    --app-surface-alt: #161920;
+    --app-border: #2a2d37;
+    --app-muted: #78808c;
+}
+
+:root[data-theme="dark"] .leaflet-bar a,
+:root[data-theme="dark"] .leaflet-control-layers,
+:root[data-theme="dark"] .leaflet-control-scale-line,
+:root[data-theme="dark"] .leaflet-control-layers-expanded {
+    background: #1a1d24;
+    border: 1px solid #2a2d37;
+    color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .leaflet-bar a {
+    color: #e5e7eb;
+    border-bottom-color: #2a2d37;
+}
+
+:root[data-theme="dark"] .leaflet-bar a:hover,
+:root[data-theme="dark"] .leaflet-bar a:focus {
+    background: #1e212d;
+    color: #fff;
+}
+
+:root[data-theme="dark"] .leaflet-control-layers-expanded {
+    padding: 8px 12px;
+}
+
+:root[data-theme="dark"] .leaflet-control-attribution {
+    background: rgba(26, 29, 36, 0.9);
+    color: #78808c;
+}
+
+:root[data-theme="dark"] .leaflet-popup-content-wrapper,
+:root[data-theme="dark"] .leaflet-popup-tip {
+    background: #1a1d24;
+    color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .leaflet-popup-content-wrapper a {
+    color: #7aa2f7;
+}
+
+/* ── Enhanced legend ── */
+:root[data-theme="dark"] .map-legend {
+    background: #1a1d24 !important;
+    color: #e5e7eb;
+    border: 1px solid #2a2d37;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .map-legend .cluster-legend {
+    color: #fff;
+}
+
+:root[data-theme="dark"] .map-legend .cluster-sample {
+    border-color: #2a2d37;
+}
+
+:root[data-theme="dark"] .map-legend i {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Enhanced routing panels ── */
 :root[data-theme="dark"] .routing-panel,
 :root[data-theme="dark"] .geocoder-panel {
+    background: #1a1d24 !important;
+    color: #e5e7eb;
+    border: 1px solid #2a2d37;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="dark"] .routing-panel h6,
+:root[data-theme="dark"] .geocoder-panel h6 {
+    color: #e5e7eb;
+}
+
+/* ── Enhanced suggestion boxes ── */
+:root[data-theme="dark"] .suggestion-box {
+    background: #1a1d24;
+    border-color: #2a2d37;
+    color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .suggestion-item {
+    color: #cbd5e0;
+    border-bottom-color: #2a2d37;
+}
+
+:root[data-theme="dark"] .suggestion-item:hover {
+    background: #1e212d;
+    color: #fff;
+}
+
+/* ── Enhanced vehicle buttons ── */
+:root[data-theme="dark"] .vehicle-btn {
+    background: #1a1d24;
+    border-color: #2a2d37;
+    color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .vehicle-btn:hover {
+    background: #1e212d;
+    border-color: #7aa2f7;
+    color: #7aa2f7;
+}
+
+:root[data-theme="dark"] .vehicle-btn.active {
+    background: #1e2d4b;
+    color: #e5e7eb;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* ── Enhanced alert colors for dark mode ── */
+:root[data-theme="dark"] .alert {
+    border-color: #2a2d37;
+}
+
+:root[data-theme="dark"] .alert.info,
+:root[data-theme="dark"] .alert-info {
+    background: #142232;
+    color: #7aa2f7;
+}
+
+:root[data-theme="dark"] .alert.warning,
+:root[data-theme="dark"] .alert-warning {
+    background: #2c1a0e;
+    color: #fcd34d;
+}
+
+:root[data-theme="dark"] .alert.danger,
+:root[data-theme="dark"] .alert-danger {
+    background: #320a0a;
+    color: #fca5a5;
+}
+
+/* ── Enhanced table styles for dark mode ── */
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] .table {
+    color: #e5e7eb;
+    border-color: #2a2d37;
+}
+
+:root[data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background: #1a1d24;
+    color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background: #1e212d;
+    color: #e5e7eb;
+}
+
+/* ── Enhanced form controls for dark mode ── */
+:root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] .form-select,
+:root[data-theme="dark"] .form-control::placeholder {
+    color: #78808c;
+}
+
+:root[data-theme="dark"] .form-control:focus,
+:root[data-theme="dark"] .form-select:focus {
+    background: #1a1d24;
+    border-color: #7aa2f7;
+    color: #e5e7eb;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* ── Enhanced pagination for dark mode ── */
+:root[data-theme="dark"] .page-item.active .page-link {
+    background: #7aa2f7;
+    border-color: #7aa2f7;
+    color: #fff;
+}
+
+/* ── Enhanced badges for dark mode ── */
+:root[data-theme="dark"] .badge {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* ── Improved tooltip for dark mode ── */
+:root[data-theme="dark"] .tooltip .tooltip-inner {
+    background: #232830;
+    color: #e5e7eb;
+}
+
+/* ── Improved offcanvas for dark mode ── */
+:root[data-theme="dark"] .offcanvas,
+:root[data-theme="dark"] .offcanvas-header,
+:root[data-theme="dark"] .offcanvas-body {
+    background: #1a1d24;
+    color: #e5e7eb;
+}
+
+/* ── Improved dropdown for dark mode ── */
+:root[data-theme="dark"] .dropdown-menu {
+    background: #1a1d24;
+    border: 1px solid #2a2d37;
+}
+
+:root[data-theme="dark"] .dropdown-item {
+    color: #cbd5e0;
+}
+
+:root[data-theme="dark"] .dropdown-item:hover,
+:root[data-theme="dark"] .dropdown-item:focus {
+    background: #1e212d;
+    color: #fff;
+}
     background: #1c1f26 !important;
     color: #e5e7eb;
     border: 1px solid #2d333b;
@@ -506,20 +718,392 @@ hr {
     color: #fff;
 }
 
-:root[data-theme="dark"] .vehicle-btn {
-    background: #1c1f26;
-    border-color: #2d333b;
-}
-
-:root[data-theme="dark"] .vehicle-btn:hover {
-    background: #232830;
-    border-color: #93c5fd;
-}
-
-:root[data-theme="dark"] .vehicle-btn.active {
-    border-color: #f59e0b;
-}
-
 :root[data-theme="dark"] .congestion-icon {
     border-color: #1c1f26;
+}
+
+/* ── Measurement Result Display ── */
+.measure-result-summary {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--app-shadow);
+    transition: all 0.2s ease;
+}
+
+.measure-result-summary:hover {
+    border-color: var(--app-link);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.measure-result-summary .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.measure-result-summary .result-header .title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--app-text);
+}
+
+.measure-result-summary .result-header .mode {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--app-muted);
+}
+
+.measure-result-summary .result-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--app-link);
+    margin: 8px 0;
+    display: block;
+}
+
+.measure-result-summary .result-unit {
+    font-size: 1rem;
+    color: var(--app-muted);
+    margin-bottom: 12px;
+    display: block;
+}
+
+.measure-result-summary .result-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.measure-result-summary .result-details .detail {
+    padding: 8px 12px;
+    background: var(--app-surface-alt);
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.measure-result-summary .result-details .label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--app-muted);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.measure-result-summary .result-details .value {
+    font-family: monospace;
+    color: var(--app-text);
+    font-weight: 600;
+}
+
+.measure-result-summary .action-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.measure-result-summary .action-btn {
+    background: transparent;
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.measure-result-summary .action-btn:hover {
+    background: var(--app-border);
+    color: var(--app-text);
+}
+
+.measure-result-summary .action-btn.active {
+    background: var(--app-link);
+    border-color: var(--app-link);
+    color: #fff;
+}
+
+.measure-result-summary .action-btn.clear {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #f87171;
+    color: #f87171;
+}
+
+.measure-result-summary .action-btn.clear:hover {
+    background: #f87171;
+    color: #fff;
+}
+
+/* ── Create a new measurement button ── */
+.btn-create-measure {
+    background: transparent;
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-create-measure:hover {
+    border-color: var(--app-link);
+    color: var(--app-link);
+}
+
+.btn-create-measure.active {
+    background: var(--app-link);
+    color: #fff;
+}
+
+.btn-create-measure.active:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+/* ── Measurement cards for multiple results ── */
+.measure-result-card {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--app-shadow);
+    transition: all 0.2s ease;
+}
+
+.measure-result-card:hover {
+    border-color: var(--app-link);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.measure-result-card .result-type {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--app-muted);
+    margin-bottom: 8px;
+    display: inline-block;
+}
+
+.measure-result-card .result-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--app-text);
+    margin-bottom: 4px;
+}
+
+.measure-result-card .result-unit {
+    font-size: 0.9rem;
+    color: var(--app-muted);
+}
+
+.measure-result-card .result-action {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: var(--app-surface-alt);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.measure-result-card .result-action:hover {
+    background: var(--app-border);
+}
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--app-text);
+    box-shadow: var(--app-shadow);
+    font-size: 13px;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .leaflet-control-measure-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: var(--app-text);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--app-border);
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .measure-result {
+    margin: 8px 0;
+    padding: 6px 10px;
+    background: var(--app-surface-alt);
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .measure-result .value {
+    font-weight: 600;
+    color: var(--app-link);
+    font-size: 1.1em;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .measure-result .unit {
+    color: var(--app-muted);
+    font-size: 0.85em;
+    margin-left: 4px;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .action-buttons {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .action-button {
+    background: var(--app-surface-alt);
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .action-button:hover {
+    background: var(--app-border);
+    color: var(--app-text);
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .action-button.active {
+    background: var(--app-link);
+    border-color: var(--app-link);
+    color: #fff;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .clear-btn {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid #f87171;
+    color: #f87171;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .clear-btn:hover {
+    background: #f87171;
+    color: #fff;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .swap-units {
+    background: rgba(13, 110, 253, 0.1);
+    border: 1px solid var(--app-link);
+    color: var(--app-link);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+:root[data-theme="dark"] .leaflet-control-measure-container .swap-units:hover {
+    background: var(--app-link);
+    color: #fff;
+}
+
+/* Create a new measurement button */
+:root[data-theme="dark"] .btn-create-measure {
+    background: transparent;
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+:root[data-theme="dark"] .btn-create-measure:hover {
+    border-color: var(--app-link);
+    color: var(--app-link);
+}
+
+:root[data-theme="dark"] .btn-create-measure.active {
+    background: var(--app-link);
+    color: #fff;
+}
+
+:root[data-theme="dark"] .btn-create-measure.active:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+/* Distance/area result cards */
+:root[data-theme="dark"] .measure-result-card {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--app-shadow);
+    transition: all 0.2s ease;
+}
+
+:root[data-theme="dark"] .measure-result-card:hover {
+    border-color: var(--app-link);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="dark"] .measure-result-card .result-type {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--app-muted);
+    margin-bottom: 8px;
+    display: inline-block;
+}
+
+:root[data-theme="dark"] .measure-result-card .result-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--app-text);
+    margin-bottom: 4px;
+}
+
+:root[data-theme="dark"] .measure-result-card .result-unit {
+    font-size: 0.9rem;
+    color: var(--app-muted);
+}
+
+:root[data-theme="dark"] .measure-result-card .result-action {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: var(--app-surface-alt);
+    border-radius 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+:root[data-theme="dark"] .measure-result-card .result-action:hover {
+    background: var(--app-border);
 }

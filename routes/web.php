@@ -138,6 +138,17 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('photo-review/reject', [PhotoReviewController::class, 'reject'])->name('photo-review.reject');
     Route::post('photo-review/approve-all', [PhotoReviewController::class, 'approveAll'])->name('photo-review.approve-all');
 
+    // Kalkulator Jarak & Cari Radius versi /admin (kompatibilitas). Route
+    // utamanya ada di /locations/radius (grup role:admin di bawah), tetapi
+    // URI lama /admin/locations/radius pernah dipakai untuk tool ini. Tanpa
+    // route eksplisit di sini, GET/POST /admin/locations/radius tertelan
+    // Route::resource('locations') -> admin/locations/{location} yang hanya
+    // menerima PUT/PATCH/DELETE, sehingga POST melempar
+    // MethodNotAllowedHttpException 405 pada tautan/berkas/halaman lama.
+    Route::get('locations/jarak', [LocationController::class, 'distance'])->name('locations.distance');
+    Route::get('locations/radius', [LocationController::class, 'radiusForm'])->name('locations.radius');
+    Route::post('locations/radius', [LocationController::class, 'radiusSearch'])->name('locations.radius.search');
+
     // Pengelolaan lokasi.
     Route::resource('locations', LocationController::class)->except(['show']);
     Route::post('locations/bulk-delete', [LocationController::class, 'bulkDelete'])->name('locations.bulk-delete');
@@ -146,11 +157,6 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('locations/impor', [LocationController::class, 'import'])->name('locations.import.store');
     Route::get('locations/template', [LocationController::class, 'template'])->name('locations.template');
     Route::post('locations/sync', [LocationController::class, 'sync'])->name('locations.sync');
-
-    // Kalkulator Jarak & Cari Radius TIDAK dideklarasikan di sini. Route-nya
-    // ada di grup role:admin,user di bawah file ini — middleware sana sudah
-    // mencakup Admin, jadi menyalinnya ke sini hanya menghasilkan nama route
-    // ganda yang diam-diam menimpa yang lain.
 
     // Kategori.
     Route::get('categories/provinsi', [CategoryController::class, 'provinces'])->name('categories.provinsi');

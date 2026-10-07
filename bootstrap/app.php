@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\IdleTimeoutMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SetLocaleMiddleware;
 use App\Providers\EventServiceProvider;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             SetLocaleMiddleware::class,
+            IdleTimeoutMiddleware::class,
         ]);
     })
     ->withSchedule(function ($schedule): void {

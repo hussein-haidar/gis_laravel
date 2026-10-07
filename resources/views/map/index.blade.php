@@ -221,7 +221,7 @@
         </div>
     </div>
 
-    <div class="position-relative mb-4">
+<div class="position-relative mb-4">
         <div id="map" style="border-radius:8px;"></div>
         <div class="map-toolbar">
             <button class="btn btn-sm btn-light" id="btn-routing" title="{{ __('messages.toolbar_route') }}">🛣️ {{ __('messages.toolbar_route') }}</button>
@@ -229,6 +229,7 @@
             <button class="btn btn-sm btn-light" id="btn-my-location" title="{{ __('messages.toolbar_my_location') }}">📡 {{ __('messages.toolbar_my_location') }}</button>
             <button class="btn btn-sm btn-light" id="btn-print-map" title="{{ __('messages.toolbar_print') }}">🖨️ {{ __('messages.toolbar_print') }}</button>
             <button class="btn btn-sm btn-light" id="btn-export-png" title="{{ __('messages.toolbar_export_png') }}">📸 {{ __('messages.toolbar_export_png') }}</button>
+            <button class="btn btn-sm btn-light" id="btn-create-measure" title="{{ __('messages.create_measurement') }}">✏️ {{ __('messages.create_measurement') }}</button>
         </div>
 
         <button type="button" id="legend-open-btn" class="map-legend-open">📋 Legenda</button>
@@ -1013,6 +1014,16 @@ map.on('moveend', updateZoomInfo);
             document.getElementById('route-from-input').value = '';
             document.getElementById('route-to-input').value = '';
             document.getElementById('route-info').innerHTML = '';
+        });
+
+        document.getElementById('btn-create-measure').addEventListener('click', function () {
+            if (measureControl.active) {
+                measureControl.deactivate();
+                alert('Measurement mode deactivated.');
+                return;
+            }
+            measureControl.activate();
+            alert('Measurement mode activated. Click on the map to measure distances or areas.');
         });
 
         // ── Lokasi Terkini (GPS) & autocomplete — sama seperti halaman Navigasi ──

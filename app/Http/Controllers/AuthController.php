@@ -186,6 +186,11 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        if ($request->boolean('idle')) {
+            return redirect()->route('login')
+                ->with('status', __('messages.idle_logged_out'));
+        }
+
         return redirect()->route('map.index');
     }
 
