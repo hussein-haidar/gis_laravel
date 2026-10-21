@@ -140,10 +140,56 @@
         .suggestion-item:hover { background: #f1f5f9; }
         #geocoder-input { width: 100%; }
         .map-toolbar {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            /* Bar aksi di dasar peta. sebelumnya tombolnya "melayang" di
+               tengah bawah sehingga menimpa kotak info zoom di pojok kiri
+               bawah (khusus di layar mobile). Sekarang jadi bar penuh,
+               jadi tidak mungkin lagi tumpang tindih. */
+            position: absolute; bottom: 0; left: 0; right: 0;
             z-index: 1000; display: flex; gap: 6px;
+            align-items: center; justify-content: center;
+            flex-wrap: wrap;
+            padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+            overflow-x: auto; overflow-y: hidden;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            background: var(--app-surface, rgba(255,255,255,0.94));
+            border-top: 1px solid var(--app-border, rgba(0,0,0,0.12));
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
+            border-radius: 0 0 8px 8px;
         }
-        .map-toolbar .btn { box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        .map-toolbar::-webkit-scrollbar { display: none; }
+        .map-toolbar .btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+            display: inline-flex; align-items: center; gap: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .map-toolbar .tb-long { display: inline; }
+        .map-toolbar .tb-short { display: none; }
+        /* Layar sempit: pakai label pendek supaya semua tombol muat satu baris. */
+        @media (max-width: 991.98px) {
+            .map-toolbar .tb-long { display: none; }
+            .map-toolbar .tb-short { display: inline; }
+            .map-toolbar { gap: 3px; padding: 4px 5px calc(4px + env(safe-area-inset-bottom, 0px)); }
+            .map-toolbar .btn {
+                font-size: 11px; padding: 3px 6px; gap: 2px; border-radius: 6px;
+            }
+            .map-toolbar .tb-ico { font-size: 12px; }
+            .map-zoom-info { min-width: 118px; font-size: 10px; padding: 5px 7px; }
+            .map-zoom-info .zoom-pct { font-size: 12px; }
+        }
+        /* Kontrol Leaflet di pojok bawah digeser ke atas bar toolbar.
+           --map-bottom-bar dihitung otomatis oleh JS (tinggi bar sebenarnya),
+           jadi tetap aman walau bar jadi 2 baris. */
+        #map .leaflet-bottom.leaflet-left,
+        #map .leaflet-bottom.leaflet-right {
+            bottom: calc(var(--map-bottom-bar, 40px) + 8px);
+        }
+        .map-legend-open {
+            bottom: calc(var(--map-bottom-bar, 40px) + 30px);
+        }
+        .map-legend {
+            margin-bottom: 26px;
+        }
         .map-zoom-info {
             background: var(--app-surface, rgba(255,255,255,0.94));
             color: var(--app-text, #111);
@@ -357,12 +403,36 @@
         </div>
         <div id="map" style="border-radius:8px;"></div>
         <div class="map-toolbar">
-            <button class="btn btn-sm btn-light" id="btn-routing" title="{{ __('messages.toolbar_route') }}">🛣️ {{ __('messages.toolbar_route') }}</button>
-            <button class="btn btn-sm btn-light" id="btn-geocode" title="{{ __('messages.toolbar_geocode') }}">📍 {{ __('messages.toolbar_geocode') }}</button>
-            <button class="btn btn-sm btn-light" id="btn-my-location" title="{{ __('messages.toolbar_my_location') }}">📡 {{ __('messages.toolbar_my_location') }}</button>
-            <button class="btn btn-sm btn-light" id="btn-print-map" title="{{ __('messages.toolbar_print') }}">🖨️ {{ __('messages.toolbar_print') }}</button>
-            <button class="btn btn-sm btn-light" id="btn-export-png" title="{{ __('messages.toolbar_export_png') }}">📸 {{ __('messages.toolbar_export_png') }}</button>
-            <button class="btn btn-sm btn-light" id="btn-create-measure" title="{{ __('messages.create_measurement') }}">✏️ {{ __('messages.create_measurement') }}</button>
+            <button class="btn btn-sm btn-light" id="btn-routing" title="{{ __('messages.toolbar_route') }}">
+                <span class="tb-ico" aria-hidden="true">🛣️</span>
+                <span class="tb-long">{{ __('messages.toolbar_route') }}</span>
+                <span class="tb-short">{{ __('messages.toolbar_route_short') }}</span>
+            </button>
+            <button class="btn btn-sm btn-light" id="btn-geocode" title="{{ __('messages.toolbar_geocode') }}">
+                <span class="tb-ico" aria-hidden="true">📍</span>
+                <span class="tb-long">{{ __('messages.toolbar_geocode') }}</span>
+                <span class="tb-short">{{ __('messages.toolbar_geocode_short') }}</span>
+            </button>
+            <button class="btn btn-sm btn-light" id="btn-my-location" title="{{ __('messages.toolbar_my_location') }}">
+                <span class="tb-ico" aria-hidden="true">📡</span>
+                <span class="tb-long">{{ __('messages.toolbar_my_location') }}</span>
+                <span class="tb-short">{{ __('messages.toolbar_my_location_short') }}</span>
+            </button>
+            <button class="btn btn-sm btn-light" id="btn-print-map" title="{{ __('messages.toolbar_print') }}">
+                <span class="tb-ico" aria-hidden="true">🖨️</span>
+                <span class="tb-long">{{ __('messages.toolbar_print') }}</span>
+                <span class="tb-short">{{ __('messages.toolbar_print_short') }}</span>
+            </button>
+            <button class="btn btn-sm btn-light" id="btn-export-png" title="{{ __('messages.toolbar_export_png') }}">
+                <span class="tb-ico" aria-hidden="true">📸</span>
+                <span class="tb-long">{{ __('messages.toolbar_export_png') }}</span>
+                <span class="tb-short">{{ __('messages.toolbar_export_png_short') }}</span>
+            </button>
+            <button class="btn btn-sm btn-light" id="btn-create-measure" title="{{ __('messages.create_measurement') }}">
+                <span class="tb-ico" aria-hidden="true">✏️</span>
+                <span class="tb-long">{{ __('messages.create_measurement') }}</span>
+                <span class="tb-short">{{ __('messages.create_measurement_short') }}</span>
+            </button>
         </div>
 
         <button type="button" id="legend-open-btn" class="map-legend-open">📋 Legenda</button>
@@ -581,6 +651,31 @@ const updateZoomInfo = function () {
 updateZoomInfo();
 map.on('zoomend', updateZoomInfo);
 map.on('moveend', updateZoomInfo);
+
+// Hitung tinggi bar toolbar bawah, lalu simpan sebagai --map-bottom-bar.
+// Kontrol Leaflet di pojok bawah (info zoom, skala, legenda) memakai
+// variabel ini untuk digeser ke ATAS bar toolbar, jadi tidak pernah
+// saling menumpuk - termasuk saat bar jadi 2 baris di layar sempit.
+(function syncBottomToolbar() {
+    const bar = document.querySelector('.map-toolbar');
+    if (!bar) return;
+    const host = bar.parentElement;
+    let last = -1;
+    const apply = function () {
+        const h = Math.ceil(bar.getBoundingClientRect().height);
+        if (h === last) return;
+        last = h;
+        if (host) host.style.setProperty('--map-bottom-bar', h + 'px');
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    if (window.ResizeObserver) {
+        // Observer disimpan di window supaya tidak di-GC sebelum sempat
+        // dipanggil (kenaivan Referensi hilang = callback tak pernah jalan).
+        window.__mapBottomToolbarObserver = new ResizeObserver(apply);
+        window.__mapBottomToolbarObserver.observe(bar);
+    }
+})();
 
         // Geocoder kontrol bawaan Leaflet dinonaktifkan (pakai pencarian custom) supaya nggak muter-muter.
 
@@ -854,6 +949,18 @@ map.on('moveend', updateZoomInfo);
             return mp[0].toFixed(5) + ',' + mp[1].toFixed(5);
         }
 
+        // Nama jalan berasal dari API luar (OSM/Nominatim/Geoapify) sehingga
+        // harus di-escape sebelum masuk HTML agar tidak bisa menyisipkan tag
+        // atau merusak tampilan.
+        function escHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         // Nama jalan belum ada → tampilkan placeholder sementara, lalu diisi
         // dari endpoint background supaya daftar TIDAK tertahan render.
         function trafficNameLabel(seg, raw) {
@@ -1083,7 +1190,7 @@ map.on('moveend', updateZoomInfo);
                 item.title = 'Klik untuk zoom ke ruas jalan ini';
                 item.innerHTML =
                     '<span>' + levels[r.lvl].icon + '</span>'
-                    + '<span><span class="tlm-name">' + r.label + '</span>'
+                    + '<span><span class="tlm-name">' + escHtml(r.label) + '</span>'
                     + '<span class="tlm-meta">' + meta + speed + len + dist + gps + '</span></span>';
 
                 item.addEventListener('click', function () {
@@ -1127,7 +1234,7 @@ map.on('moveend', updateZoomInfo);
                 const extraHtml = extra.length ? '<br><small>' + extra.join(' • ') + '</small>' : '';
 
                 L.polyline(points, { color: seg.color, weight: 6, opacity: 0.75 })
-                    .bindPopup(`<strong>${lvl.emoji} ${lvl.label}</strong><br>${st}${extraHtml}`)
+                    .bindPopup('<strong>' + lvl.emoji + ' ' + lvl.label + '</strong><br>' + escHtml(st) + extraHtml)
                     .addTo(congestionLayer);
             });
         }

@@ -251,8 +251,10 @@ class AdminMenuAndVisitHistoryTest extends TestCase
         // labelnya, bukan dari URL, karena /admin/locations tetap muncul
         // sebagai prefiks pada Impor/Ekspor Data.
         $response->assertDontSee('Kelola Lokasi');
-        // "Riwayat Perjalanan" adalah data milik milik pengunjung.
+        // "Riwayat Perjalanan" adalah data milik pengunjung.
         $response->assertDontSee(route('history.index'));
+        // "Tempat Favorit" tetap terlihat untuk Super Admin.
+        $response->assertSee(route('favorites.index'));
         // "Pengaturan" dipindahkan ke dropdown role Admin.
         $response->assertDontSee(route('admin.settings.index'));
     }
@@ -266,8 +268,10 @@ class AdminMenuAndVisitHistoryTest extends TestCase
         $response->assertSee(route('admin.locations.index'));
         $response->assertSee('Pengaturan');
         $response->assertSee(route('admin.settings.index'));
-        // Admin tetap punya Riwayat Perjalanan.
-        $response->assertSee(route('history.index'));
+        // Admin tidak lagi melihat Riwayat Perjalanan (Trip History),
+        // tapi tetap melihat Tempat Favorit.
+        $response->assertDontSee(route('history.index'));
+        $response->assertSee(route('favorites.index'));
     }
 
     public function test_super_admin_navbar_keeps_web_and_activity_log(): void

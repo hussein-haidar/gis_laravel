@@ -522,6 +522,51 @@ class TomTomTrafficService
     }
 
     /**
+     * Kumpulkan segmen kemacetan unik untuk daftar titik probe.
+     *
+     * Dipakai baik oleh respons sinkron (flow-bounds) maupun oleh refresh
+     * latar belakang, supaya keduanya memakai aturan yang sama:
+     *   1. probe paralel   → flowSegmentsAt()
+     *   2. buang ruas kembar → dedupe by midpoint
+     *   3. isi nama dari cache saja (nama live diambil endpoint terpisah)
+     *   4. gabung ruas dengan nama jalan identik
+     *
+     * @param  array $probes daftar [lat, lng]
+     * @return array daftar segmen
+     */
+    public function collectFlowSegments(array $probes): array
+    {
+        $segments = [];
+        $seen = [];
+
+        foreach ($this->flowSegmentsAt($probes) as $seg) {
+            if (! $seg || ! is_array($seg) || empty($seg['midpoint'])) {
+                continue;
+            }
+
+            $mid = $seg['midpoint'];
+            if (! isset($mid[0], $mid[1])) {
+                continue;
+            }
+
+            $key = round($mid[0], 4) . ',' . round($mid[1], 4);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $segments[] = $seg;
+
+            if (count($segments) >= 20) {
+                break;
+            }
+        }
+
+        $this->applyCachedStreetNames($segments);
+
+        return $this->dedupeByStreet($segments);
+    }
+
+    /**
      * Resolve nama jalan untuk banyak titik sekaligus (batch + paralel).
      *
      * Versi lama resolve satu per satu (Overpass → Nominatim → Geoapify →
@@ -596,7 +641,9 @@ class TomTomTrafficService
         }
 
         if (empty($todo)) {
-            return [];
+            // Tetap kembalikan array sepanjang input (isi kosong) supaya
+            // indeks respons tidak bergeser di sisi klien.
+            return array_fill(0, count(array_values($points)), '');
         }
 
         $out = [];
@@ -671,9 +718,17 @@ class TomTomTrafficService
             }
         }
 
-        ksort($out);
+        // PENTING: indeks hasil harus PERSIS sama dengan indeks input.
+        // Kalau ada titik yang dilewati (mis. koordinat tidak valid), memakai
+        // array_values() akan menggeser semua nama dan menyebabkan nama jalan
+        // menempel ke ruas yang salah.
+        $total = count(array_values($points));
+        $result = [];
+        for ($i = 0; $i < $total; $i++) {
+            $result[$i] = (string) ($out[$i] ?? '');
+        }
 
-        return array_values($out);
+        return $result;
     }
 
     protected function streetCacheKey(float $lat, float $lng): string
@@ -879,16 +934,20 @@ class TomTomTrafficService
 
             $group = is_array($group) ? array_values($group) : [$group];
 
-            $todo = array_slice($todo, 0, 20);
-            $names = $this->requestStreetSourcesParallel($todo, $group);
-
+            // PAtual dalam blok 20 supaya SEMUA titik tetap diproses.
+            // Sebelumnya array_slice(0, 20) membuat titik ke-21+ dilewati
+            // tanpa pernah searched (nama jalannya kosong selamanya).
             $rest = [];
-            foreach ($todo as $i => $t) {
-                $name = trim((string) ($names[$i] ?? ''));
-                if ($name !== '') {
-                    $result[$t['idx']] = $name;
-                } else {
-                    $rest[] = $t;
+            foreach (array_chunk($todo, 20) as $chunk) {
+                $names = $this->requestStreetSourcesParallel($chunk, $group);
+
+                foreach ($chunk as $i => $t) {
+                    $name = trim((string) ($names[$i] ?? ''));
+                    if ($name !== '') {
+                        $result[$t['idx']] = $name;
+                    } else {
+                        $rest[] = $t;
+                    }
                 }
             }
             $todo = $rest;
@@ -911,7 +970,7 @@ class TomTomTrafficService
      */
     protected function requestStreetSourcesParallel(array $points, array $sources): array
     {
-        $points = array_slice(array_values($points), 0, 20);
+        $points = array_slice(array_values($points), 0, 50);
         if (empty($points) || empty($sources)) {
             return [];
         }

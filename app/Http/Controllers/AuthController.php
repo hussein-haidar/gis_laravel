@@ -32,11 +32,23 @@ class AuthController extends Controller
             $request->session()->regenerate();
 
             $user = Auth::user();
+
+            // Setiap role punya halaman awal sendiri. Untuk pengguna biasa
+            // JANGAN pakai redirect()->intended(): URL yang tersimpan di
+            // session bisa berupa halaman admin (mis. saat sebelumnya mencoba
+            // membuka URL admin), sehingga pengguna biasa terlempar ke halaman
+            // admin dan ditolak karena tidak punya akses. Itulah sumber bug
+            // "kadang ditolak / URL mengarah ke admin".
             if ($user->hasRole('super_admin')) {
                 return redirect()->intended(route('super-admin.dashboard'));
             }
 
-            return redirect()->intended(route('admin.locations.index'));
+            if ($user->hasRole('admin')) {
+                return redirect()->intended(route('admin.locations.index'));
+            }
+
+            // Pengguna biasa → langsung ke peta utama, abaikan intended URL.
+            return redirect()->route('map.index');
         }
 
         return back()
@@ -137,7 +149,17 @@ class AuthController extends Controller
 
         Auth::login($user, true);
 
-        return redirect()->intended(route('map.index'));
+        // Samakan perilaku dengan login email/password: pengguna biasa selalu
+        // ke peta, admin/super-admin ke dashboard masing-masing. Jangan pakai
+        // intended() untuk pengguna biasa (bisa mengarah ke URL admin).
+        if ($user->hasRole('super_admin')) {
+            return redirect()->route('super-admin.dashboard');
+        }
+        if ($user->hasRole('admin')) {
+            return redirect()->route('admin.locations.index');
+        }
+
+        return redirect()->route('map.index');
     }
 
     /**

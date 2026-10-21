@@ -68,6 +68,13 @@ return [
     'create_measurement' => 'Buat Pengukuran',
     'toolbar_print' => 'Cetak Peta',
     'toolbar_export_png' => 'Export PNG',
+    // Label pendek untuk toolbar di layar sempit (mobile)
+    'toolbar_route_short' => 'Rute',
+    'toolbar_geocode_short' => 'Cari',
+    'toolbar_my_location_short' => 'Saya',
+    'create_measurement_short' => 'Ukur',
+    'toolbar_print_short' => 'Cetak',
+    'toolbar_export_png_short' => 'PNG',
     'route_origin' => 'Lokasi Terkini (Asal)',
     'route_destination' => 'Lokasi Tujuan',
     'route_origin_placeholder' => 'Deteksi GPS / ketik lokasi asal...',

@@ -1053,6 +1053,18 @@
             return mp[0].toFixed(5) + ',' + mp[1].toFixed(5);
         }
 
+        // Nama jalan berasal dari API luar (OSM/Nominatim/Geoapify) sehingga
+        // harus di-escape sebelum masuk HTML agar tidak bisa menyisipkan tag
+        // atau merusak tampilan.
+        function escHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function trafficNameLabel(seg, raw) {
             if (raw) return raw;
             const key = trafficMidKey(seg);
@@ -1258,7 +1270,7 @@
                 item.title = 'Klik untuk zoom ke ruas jalan ini';
                 item.innerHTML =
                     '<span>' + levels[r.lvl].icon + '</span>'
-                    + '<span><span class="tl-name">' + r.label + '</span>'
+                    + '<span><span class="tl-name">' + escHtml(r.label) + '</span>'
                     + '<span class="tl-meta">' + meta + speed + len + dist + gps + '</span></span>';
 
                 item.addEventListener('click', function () {
@@ -1291,7 +1303,7 @@
                 congestionCounts[lvl] = (congestionCounts[lvl] || 0) + 1;
                 const rawName = trafficRawName(seg);
                 const nameLabel = trafficNameLabel(seg, rawName);
-                const streetTxt = rawName ? '<br>🛣️ ' + rawName : '';
+                const streetTxt = rawName ? '<br>🛣️ ' + escHtml(rawName) : '';
                 const lenKm = segLenKm(points);
                 const distM = minDistToPoints(points, origin);
                 const gpsM = hasUserLocation()
@@ -1317,7 +1329,7 @@
                         color: '#fff', weight: 2,
                         fillColor: seg.color, fillOpacity: 0.95,
                         className: 'jam-dot',
-                    }).bindTooltip(segLabel(lvl) + (rawName ? ' · ' + rawName : ''), { direction: 'top', opacity: 0.9 })
+                    }).bindTooltip(segLabel(lvl) + (rawName ? ' · ' + escHtml(rawName) : ''), { direction: 'top', opacity: 0.9 })
                         .addTo(congestionLayer);
                 });
                 if (severe) {

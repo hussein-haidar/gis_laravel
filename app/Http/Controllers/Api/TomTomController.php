@@ -176,38 +176,7 @@ class TomTomController extends Controller
 
         // Semua probe dikirim KONKUREN (bukan satu per satu) sehingga total
         // waktu ≈ request terlama.
-        $segments = [];
-        $seen = [];
-
-        foreach ($this->traffic->flowSegmentsAt($probes) as $seg) {
-            if (! $seg) {
-                continue;
-            }
-
-            $mid = $seg['midpoint'];
-            $key = round($mid[0], 4) . ',' . round($mid[1], 4);
-            if (isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-            $segments[] = $seg;
-
-            if (count($segments) >= 20) {
-                break;
-            }
-        }
-
-        // Nama jalan diisi HANYA dari cache di sini supaya respons cepat
-        // (daftar langsung tampil begitu data TomTom sampai). Nama yang belum
-        // ada diisi terpisah lewat endpoint background /traffic/street-names.
-        if (method_exists($this->traffic, 'applyCachedStreetNames')) {
-            $this->traffic->applyCachedStreetNames($segments);
-        }
-
-        // Ruas jalan yang sama (hasil probe berbeda) cukup dikembalikan sekali.
-        if (method_exists($this->traffic, 'dedupeByStreet')) {
-            $segments = $this->traffic->dedupeByStreet($segments);
-        }
+        $segments = $this->traffic->collectFlowSegments($probes);
 
         if (! empty($segments)) {
             Cache::put($cacheKey, $segments, now()->addSeconds(90));
@@ -226,45 +195,49 @@ class TomTomController extends Controller
      * Dipakai pola stale-while-revalidate: pengguna langsung melihat data
      * lama, lalu cache diperbarui diam-diam supaya request berikutnya
      * selalu memakai data segar.
+     *
+     * CATATAN PENTING: Illuminate\Foundation\Application::terminate() TIDAK
+     * mengosongkan daftar callback terminating, sedangkan proses PHP milik
+     * Apache (mod_php) dipakai ulang untuk banyak request. Kalau callback
+     * didaftarkan setiap request, callback akan MENUMPUK dan refresh TomTom
+     * dijalankan berulang kali (boros kuota + lambat). Karena itu callback
+     * didaftarkan SATU kali per proses, dengan payload disimpan di variable
+     * statis yang selalu ditimpa request berikutnya.
      */
     protected function refreshTrafficInBackground(array $probes, string $cacheKey, string $staleKey): void
     {
-        app()->terminating(function () use ($probes, $cacheKey, $staleKey) {
+        static $registered = false;
+        static $payload = null;
+
+        $payload = [
+            'probes' => $probes,
+            'cache' => $cacheKey,
+            'stale' => $staleKey,
+        ];
+
+        if ($registered) {
+            return;
+        }
+        $registered = true;
+
+        app()->terminating(function () use (&$payload) {
+            if (! is_array($payload) || empty($payload['probes'])) {
+                $payload = null;
+
+                return;
+            }
+
+            $job = $payload;
+            $payload = null;
+
             try {
-                $segments = [];
-                $seen = [];
-
-                foreach ($this->traffic->flowSegmentsAt($probes) as $seg) {
-                    if (! $seg) {
-                        continue;
-                    }
-
-                    $mid = $seg['midpoint'];
-                    $key = round($mid[0], 4) . ',' . round($mid[1], 4);
-                    if (isset($seen[$key])) {
-                        continue;
-                    }
-                    $seen[$key] = true;
-                    $segments[] = $seg;
-
-                    if (count($segments) >= 20) {
-                        break;
-                    }
-                }
-
+                $segments = app(TomTomTrafficService::class)->collectFlowSegments($job['probes']);
                 if (empty($segments)) {
                     return;
                 }
 
-                if (method_exists($this->traffic, 'applyCachedStreetNames')) {
-                    $this->traffic->applyCachedStreetNames($segments);
-                }
-                if (method_exists($this->traffic, 'dedupeByStreet')) {
-                    $segments = $this->traffic->dedupeByStreet($segments);
-                }
-
-                Cache::put($cacheKey, $segments, now()->addSeconds(90));
-                Cache::put($staleKey, $segments, now()->addMinutes(15));
+                Cache::put($job['cache'], $segments, now()->addSeconds(90));
+                Cache::put($job['stale'], $segments, now()->addMinutes(15));
             } catch (\Throwable $e) {
                 Log::warning('[TomTom] refresh latar gagal: ' . $e->getMessage());
             }

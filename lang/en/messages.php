@@ -67,6 +67,13 @@ return [
     'create_measurement' => 'Create Measurement',
     'toolbar_print' => 'Print Map',
     'toolbar_export_png' => 'Export PNG',
+    // Short labels for the toolbar on small screens (mobile)
+    'toolbar_route_short' => 'Route',
+    'toolbar_geocode_short' => 'Find',
+    'toolbar_my_location_short' => 'GPS',
+    'create_measurement_short' => 'Measure',
+    'toolbar_print_short' => 'Print',
+    'toolbar_export_png_short' => 'PNG',
     'route_origin' => 'Current Location (Origin)',
     'route_destination' => 'Destination',
     'route_origin_placeholder' => 'Detect GPS / type origin location...',

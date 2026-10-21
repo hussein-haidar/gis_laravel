@@ -102,16 +102,14 @@
                     </li>
                     {{-- "Riwayat Perjalanan" adalah data milik pengunjung, bukan
                          tugas Super Admin. --}}
-                    @if (! Auth::user()->hasRole('super_admin'))
+                    @if (! Auth::user()->hasRole('admin', 'super_admin'))
                         <li class="nav-item">
                             <a class="nav-link" href="{{ route('history.index') }}">{{ __('messages.nav_history') }}</a>
                         </li>
                     @endif
-                    @if (! Auth::user()->hasRole('super_admin'))
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('favorites.index') }}">{{ __('messages.nav_favorites') }}</a>
-                        </li>
-                    @endif
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('favorites.index') }}">{{ __('messages.nav_favorites') }}</a>
+                    </li>
                     @if (Auth::user()->hasRole('super_admin'))
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Super Admin</a>
