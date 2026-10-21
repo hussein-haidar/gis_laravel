@@ -168,15 +168,6 @@
             display: flex; justify-content: space-between; gap: 10px;
             opacity: 0.7; font-size: 10px;
         }
-        .congestion-icon {
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 50%; border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-            font-size: 11px; color: #fff; font-weight: 700;
-        }
-        .congestion-icon.severe { background: #e60000; width: 28px; height: 28px; }
-        .congestion-icon.moderate { background: #e6b800; width: 24px; height: 24px; }
-        .congestion-icon.light { background: #a4c3d3; width: 20px; height: 20px; font-size: 10px; }
         .vehicle-btn {
             width: 48px; height: 48px; border: 2px solid #e5e7eb;
             border-radius: 12px; background: #fff; font-size: 1.5rem;
@@ -188,6 +179,118 @@
             border-color: #f59e0b; background: #ffd166;
             box-shadow: 0 0 0 3px rgba(245,158,11,0.45);
             transform: scale(1.08);
+        }
+
+        /* Daftar titik macet (mirip halaman Navigasi) */
+        .traffic-list-map {
+            max-height: 230px;
+            overflow-y: auto;
+        }
+        .traffic-list-map-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+        .traffic-list-map-item:hover {
+            background: #f1f5f9;
+        }
+        :root[data-theme="dark"] .traffic-list-map-item:hover {
+            background: #1e212d;
+        }
+        .traffic-list-map-item .tlm-name {
+            display: block;
+            font-weight: 600;
+            font-size: .82rem;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        .traffic-list-map-item .tlm-meta {
+            display: block;
+            font-size: .72rem;
+            color: #6b7280;
+            line-height: 1.3;
+            margin-top: 1px;
+        }
+        :root[data-theme="dark"] .traffic-list-map-item .tlm-meta {
+            color: #8b949e;
+        }
+        /* Keterangan (legenda) kondisi jalur + jumlah ruas per level */
+        .traffic-legend-map {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed var(--app-border, #e5e7eb);
+        }
+        .traffic-legend-map .tlm-legend-title {
+            font-size: .7rem;
+            font-weight: 600;
+            color: var(--app-text, #111);
+            margin-bottom: 3px;
+        }
+        .traffic-legend-map .tlm-legend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 8px;
+            font-size: .68rem;
+            color: var(--app-text, #111);
+        }
+        .traffic-legend-map .tlm-legend-grid > span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .traffic-legend-map .tlm-legend-grid i {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            flex: 0 0 auto;
+        }
+        .traffic-legend-map .tlm-legend-grid b {
+            margin-left: auto;
+            font-variant-numeric: tabular-nums;
+            color: var(--app-text, #111);
+        }
+        .traffic-panel-map {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 1000;
+            background: var(--app-surface, #fff);
+            color: var(--app-text, #111);
+            border: 1px solid var(--app-border, #e5e7eb);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+            width: min(320px, calc(100vw - 20px));
+            max-width: 320px;
+            display: none;
+        }
+        .traffic-panel-map.active {
+            display: block;
+        }
+        .traffic-panel-map-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px 6px 10px;
+            border-bottom: 1px solid var(--app-border, #e5e7eb);
+        }
+        .traffic-panel-map-body {
+            padding: 6px 8px 8px 8px;
+        }
+        @media (max-width: 575.98px) {
+            .traffic-panel-map {
+                left: 8px;
+                right: 8px;
+                width: auto;
+                max-width: none;
+            }
         }
     </style>
 @endsection
@@ -222,6 +325,36 @@
     </div>
 
 <div class="position-relative mb-4">
+        <!-- Panel Titik Macet (mirip Navigasi) - diletakkan di dalam container peta -->
+        <div id="traffic-panel-map" class="traffic-panel-map">
+            <div class="traffic-panel-map-header">
+                <div class="fw-semibold small">
+                    📍 Titik macet di area ini
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge text-bg-secondary" id="traffic-map-count">—</span>
+                    <button type="button" class="btn-close btn-close-sm" aria-label="Tutup" id="traffic-map-close"></button>
+                </div>
+            </div>
+            <div class="traffic-panel-map-body">
+                <div id="traffic-list-map" class="traffic-list-map">
+                    <div class="text-muted small px-1">Memuat data kemacetan...</div>
+                </div>
+                <!-- Keterangan kondisi jalur + variasi jumlah ruas per level -->
+                <div id="traffic-legend-map" class="traffic-legend-map" style="display:none;">
+                    <div class="tlm-legend-title">{{ __('messages.traffic_legend_title') }}</div>
+                    <div class="tlm-legend-grid">
+                        <span><i style="background:#e60000;"></i>{{ __('messages.jam_severe') }}<b id="tlm-cnt-severe">0</b></span>
+                        <span><i style="background:#e6b800;"></i>{{ __('messages.jam_heavy') }}<b id="tlm-cnt-moderate">0</b></span>
+                        <span><i style="background:#60a5fa;"></i>{{ __('messages.jam_busy') }}<b id="tlm-cnt-ramai">0</b></span>
+                        <span><i style="background:#16a34a;"></i>{{ __('messages.jam_flow') }}<b id="tlm-cnt-light">0</b></span>
+                    </div>
+                </div>
+                <div class="text-muted px-1" style="font-size: .66rem; margin-top: 4px;">
+                    {{ __('messages.traffic_distance_hint') }}
+                </div>
+            </div>
+        </div>
         <div id="map" style="border-radius:8px;"></div>
         <div class="map-toolbar">
             <button class="btn btn-sm btn-light" id="btn-routing" title="{{ __('messages.toolbar_route') }}">🛣️ {{ __('messages.toolbar_route') }}</button>
@@ -441,20 +574,15 @@ const updateZoomInfo = function () {
 
     zoomInfo._pct.textContent = persen + '%';
     zoomInfo._fill.style.width = persen + '%';
-    zoomInfo._level.textContent = 'z' + z + '/' + max;
-    zoomInfo._scale.textContent = '1:' + formatRibuan(Math.round(mpp * 1000 / 0.264583));
+    zoomInfo._level.textContent = 'Tingkat Zoom: ' + z + ' / ' + max;
+    zoomInfo._scale.textContent = 'Skala: 1 : ' + formatRibuan(Math.round(mpp * 1000 / 0.264583));
 };
 
 updateZoomInfo();
 map.on('zoomend', updateZoomInfo);
 map.on('moveend', updateZoomInfo);
 
-        const geocoder = L.Control.Geocoder.nominatim();
-        const geocoderControl = L.Control.geocoder({
-            geocoder: geocoder,
-            defaultMarkPoint: true,
-            position: 'topleft',
-        }).addTo(map);
+        // Geocoder kontrol bawaan Leaflet dinonaktifkan (pakai pencarian custom) supaya nggak muter-muter.
 
         const measureControl = new L.Control.Measure({
             position: 'topleft',
@@ -600,25 +728,18 @@ map.on('moveend', updateZoomInfo);
         }
 
         const overlays = {};
-
-        const congestionIconHtml = {
-            severe: '<div class="congestion-icon severe">!</div>',
-            moderate: '<div class="congestion-icon moderate">~</div>',
-            light: '<div class="congestion-icon light">·</div>',
-        };
-
-        const congestionIconSizes = { severe: [28, 28], moderate: [24, 24], light: [20, 20] };
-        const congestionIconAnchors = { severe: [14, 14], moderate: [12, 12], light: [10, 10] };
+        document.addEventListener('DOMContentLoaded', function () {
+            const closeBtn = document.getElementById('traffic-map-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function () {
+                    const panel = document.getElementById('traffic-panel-map');
+                    if (panel) panel.classList.remove('active');
+                });
+            }
+        });
 
         const congestionLayer = L.layerGroup();
-
-        // Nama jalan cadangan, dipakai hanya bila jalan Overpass tidak punya
-        // tag "name" atau layer sedang memakai titik cadangan.
-        const congestionNames = [
-            'Jl. Melati', 'Jl. Anggrek', 'Jl. Kenanga', 'Jl. Mawar',
-            'Jl. Diponegoro', 'Jl. Sudirman', 'Jl. Gatot Subroto',
-            'Jl. Ahmad Yani', 'Jl. Veteran', 'Jl. Pahlawan'
-        ];
+        let lastTrafficSegmentsMap = [];
 
         // Nomor urut request. Jawaban yang sudah basi diabaikan supaya tidak
         // menimpa marker yang lebih baru — zoom cepat memicu banyak request
@@ -636,33 +757,386 @@ map.on('moveend', updateZoomInfo);
             return fetch(url, opts).finally(function () { clearTimeout(timer); });
         }
 
-        function severityLabel(level) {
-            if (level === 'severe') return { text: '🔴 Macet Parah', color: '#e60000' };
-            if (level === 'moderate') return { text: '🟡 Padat', color: '#e6b800' };
-            return { text: '🟢 Lancar', color: '#a4c3d3' };
-        }
-
         function colorToTrafficLevel(color) {
             if (color === '#e60000') return { label: 'Macet Parah', emoji: '🔴', severity: 'severe' };
-            if (color === '#e6b800') return { label: 'Padat', emoji: '🟡', severity: 'moderate' };
-            if (color === '#60a5fa') return { label: 'Ramai', emoji: '🔵', severity: 'moderate' };
-            if (color === '#a4c3d3') return { label: 'Lancar', emoji: '🟢', severity: 'light' };
+            if (color === '#e6b800' || color === '#f59e0b') return { label: 'Padat', emoji: '🟡', severity: 'moderate' };
+            if (color === '#60a5fa' || color === '#3b82f6') return { label: 'Ramai', emoji: '🔵', severity: 'moderate' };
+            if (color === '#a4c3d3' || color === '#22c55e') return { label: 'Lancar', emoji: '🟢', severity: 'light' };
             return { label: 'Normal', emoji: '🟢', severity: 'light' };
         }
 
+        // Acuan jarak daftar kemacetan: TENGAH PETA (dinamis — berubah saat
+        // pengguna menggeser/zoom peta). Lokasi GPS hanya sebagai tambahan.
+        function trafficOriginLatLng() {
+            if (map && map.getCenter) {
+                const c = map.getCenter();
+                if (c && isFinite(c.lat) && isFinite(c.lng)) {
+                    return L.latLng(c.lat, c.lng);
+                }
+            }
+            if (window.userLatLng && isFinite(window.userLatLng[0]) && isFinite(window.userLatLng[1])) {
+                return L.latLng(window.userLatLng[0], window.userLatLng[1]);
+            }
+            return null;
+        }
+
+        function fmtTrafficDist(km) {
+            if (!isFinite(km) || km < 0) return '';
+            if (km < 1) return Math.round(km * 1000) + ' m';
+            return km.toFixed(2) + ' km';
+        }
+
+        // Jarak terdekat ke ruas jalan (meter)
+        function minDistToPoints(pts, origin) {
+            if (!origin) return NaN;
+            let min = Infinity;
+            for (let i = 0; i < pts.length; i++) {
+                const p = pts[i];
+                if (!p || !isFinite(p[0]) || !isFinite(p[1])) continue;
+                const d = origin.distanceTo(L.latLng(p[0], p[1]));
+                if (d < min) min = d;
+            }
+            return isFinite(min) ? min : NaN;
+        }
+
+        // Samakan nama jalan supaya perbandingan tidak membedakan spasi/kapital.
+        function normStreetKey(name) {
+            return String(name || '')
+                .replace(/\s+/g, ' ')
+                .replace(/[\s.,;:\-–—]+$/g, '')
+                .trim()
+                .toLowerCase();
+        }
+
+        // ── Lokasi GPS (opsional) ────────────────────────────────────────────
+        // Jarak ditampilkan DUA acuan sekaligus:
+        //   1) dari tengah peta  → dinamis, berubah saat peta digeser/zoom
+        //   2) dari posisi Anda  → GPS, diperoleh otomatis (tanpa alert)
+        // Lokasi GPS diminta otomatis supaya tidak harus klik tombol dulu.
+        let userLocationRequested = false;
+
+        function hasUserLocation() {
+            return !!(window.userLatLng && isFinite(window.userLatLng[0]) && isFinite(window.userLatLng[1]));
+        }
+
+        function ensureUserLocation() {
+            if (hasUserLocation()) return;
+            if (userLocationRequested) return;
+            if (!navigator.geolocation) return;
+            userLocationRequested = true;
+
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                window.userLatLng = [pos.coords.latitude, pos.coords.longitude];
+                // Jarak GPS baru tersedia → segarkan daftar + polyline.
+                if (lastTrafficSegmentsMap && lastTrafficSegmentsMap.length) {
+                    renderTrafficListMap(lastTrafficSegmentsMap);
+                }
+            }, function () {
+                // Izin ditolak / GPS tidak tersedia: jarak dari Anda
+                // disembunyikan, jarak dari tengah peta tetap dipakai.
+            }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+        }
+
+        // Nama jalan yang sudah pernah diminta (supaya tidak ada request
+        // berulang) dan yang sudah selesai prosesnya.
+        const streetNameRequested = new Set();
+        const streetNameResolved = new Set();
+        let streetNameToken = 0;
+
+        function trafficRawName(seg) {
+            if (seg.street && seg.street.trim() !== '') return seg.street;
+            return String(seg.roadName || seg.roadname || seg.name || seg.road || '').trim();
+        }
+
+        function trafficMidKey(seg) {
+            const mp = seg.midpoint;
+            if (!mp || !isFinite(mp[0]) || !isFinite(mp[1])) return '';
+            return mp[0].toFixed(5) + ',' + mp[1].toFixed(5);
+        }
+
+        // Nama jalan belum ada → tampilkan placeholder sementara, lalu diisi
+        // dari endpoint background supaya daftar TIDAK tertahan render.
+        function trafficNameLabel(seg, raw) {
+            if (raw) return raw;
+            const key = trafficMidKey(seg);
+            if (key && streetNameResolved.has(key)) return 'Jalan (nama tidak tersedia)';
+            return '⏳ Mengambil nama jalan…';
+        }
+
+        // Ambil nama jalan yang belum ada (background, tidak memblokir peta).
+        // Dua tahap: tahap cepat (sumber tercepat) supaya nama muncul dalam
+        // ~0.3 detik, lalu tahap mendalam untuk sisanya.
+        function fetchMissingStreetNames(points) {
+            const todo = [];
+            const seen = {};
+            (points || []).forEach(function (p) {
+                if (!p || !isFinite(p[0]) || !isFinite(p[1])) return;
+                const key = p[0].toFixed(5) + ',' + p[1].toFixed(5);
+                if (seen[key] || streetNameRequested.has(key)) return;
+                seen[key] = true;
+                streetNameRequested.add(key);
+                todo.push([p[0], p[1]]);
+            });
+            if (!todo.length) return;
+
+            const token = ++streetNameToken;
+            requestStreetNames(todo, false, token).then(function (names) {
+                if (token !== streetNameToken) return;
+                applyStreetNames(names, todo);
+
+                // Masih ada yang belum bernama → coba sumber yang lebih dalam.
+                const missing = [];
+                const idx = {};
+                todo.forEach(function (p, i) { idx[p[0].toFixed(5) + ',' + p[1].toFixed(5)] = i; });
+                (lastTrafficSegmentsMap || []).forEach(function (seg) {
+                    if (seg.street && seg.street.trim() !== '') return;
+                    const mid = seg.midpoint;
+                    if (!mid || !isFinite(mid[0]) || !isFinite(mid[1])) return;
+                    const k = mid[0].toFixed(5) + ',' + mid[1].toFixed(5);
+                    if (!(k in idx)) return;
+                    missing.push([mid[0], mid[1]]);
+                });
+                if (missing.length) {
+                    requestStreetNames(missing, true, token).then(function (deepNames) {
+                        if (token !== streetNameToken) return;
+                        applyStreetNames(deepNames, missing);
+                        todo.concat(missing).forEach(function (p) {
+                            streetNameResolved.add(p[0].toFixed(5) + ',' + p[1].toFixed(5));
+                        });
+                        refreshTrafficViews();
+                    }).catch(function () { finishStreetNames(todo.concat(missing)); });
+                } else {
+                    finishStreetNames(todo);
+                }
+            }).catch(function () { finishStreetNames(todo); });
+        }
+
+        // Panggil endpoint nama jalan.
+        function requestStreetNames(points, deep, token) {
+            return fetchWithTimeout(`${API_BASE}/traffic/street-names`, 15000, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ points: points, deep: !!deep }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (json) {
+                    return (json && json.status === 'ok' && Array.isArray(json.names)) ? json.names : [];
+                });
+        }
+
+        // Terapkan nama yang diterima ke segmen yang sedang tampil.
+        function applyStreetNames(names, points) {
+            if (!names || !names.length) return;
+            const keyIndex = {};
+            (points || []).forEach(function (p, i) { keyIndex[p[0].toFixed(5) + ',' + p[1].toFixed(5)] = i; });
+
+            (lastTrafficSegmentsMap || []).forEach(function (seg) {
+                const key = trafficMidKey(seg);
+                if (!key || !(key in keyIndex)) return;
+                const name = names[keyIndex[key]];
+                if (name && String(name).trim() !== '') {
+                    seg.street = String(name).trim();
+                    seg.roadName = seg.street;
+                }
+            });
+
+            refreshTrafficViews();
+        }
+
+        // Tandai sebagai selesai + segarkan tampilan (placeholder → nama).
+        function finishStreetNames(points) {
+            (points || []).forEach(function (p) {
+                streetNameResolved.add(p[0].toFixed(5) + ',' + p[1].toFixed(5));
+            });
+            refreshTrafficViews();
+        }
+
+        // Segarkan daftar + popup polyline tanpa menggambar ulang peta.
+        function refreshTrafficViews() {
+            if (lastTrafficSegmentsMap && lastTrafficSegmentsMap.length) {
+                renderTrafficListMap(lastTrafficSegmentsMap);
+                renderTrafficPolylines(lastTrafficSegmentsMap);
+            }
+        }
+
         // TomTom flow (server-side, key aman di backend): segmen polyline berwarna.
-        function renderTomTomTraffic(segments, token) {
-            if (token !== congestionToken) return;
+        function renderTrafficListMap(segments) {
+            const box = document.getElementById('traffic-list-map');
+            const count = document.getElementById('traffic-map-count');
+            const panel = document.getElementById('traffic-panel-map');
+            if (!box) return;
+
+            const levels = {
+                severe: { icon: '🔴', label: 'Macet parah', color: '#e60000' },
+                moderate: { icon: '🟠', label: 'Padat', color: '#f59e0b' },
+                ramai: { icon: '🔵', label: 'Ramai', color: '#3b82f6' },
+                light: { icon: '🟢', label: 'Lancar', color: '#22c55e' },
+            };
+
+            const rows = [];
+            const pendingNamePoints = [];
+            const origin = trafficOriginLatLng();
+            const gpsOrigin = (window.userLatLng && isFinite(window.userLatLng[0]) && isFinite(window.userLatLng[1]))
+                ? L.latLng(window.userLatLng[0], window.userLatLng[1]) : null;
+            (segments || []).forEach(function (seg) {
+                const pts = seg.points || [];
+                if (pts.length < 2) return;
+                const c = seg.color || '#a4c3d3';
+                let lvl = 'light';
+                if (c === '#e60000') lvl = 'severe';
+                else if (c === '#e6b800' || c === '#f59e0b') lvl = 'moderate';
+                else if (c === '#60a5fa' || c === '#3b82f6') lvl = 'ramai';
+                else if (c === '#a4c3d3' || c === '#22c55e' || c === '#16a34a') lvl = 'light';
+                const mid = pts[Math.floor(pts.length / 2)];
+                if (!mid || !isFinite(mid[0]) || !isFinite(mid[1])) return;
+                let lenKm = 0;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const p1 = L.latLng(pts[i][0], pts[i][1]);
+                    const p2 = L.latLng(pts[i + 1][0], pts[i + 1][1]);
+                    lenKm += p1.distanceTo(p2) / 1000;
+                }
+                const distM = minDistToPoints(pts, origin);
+                const gpsM = gpsOrigin ? minDistToPoints(pts, gpsOrigin) : NaN;
+                const rawName = trafficRawName(seg);
+                if (!rawName && seg.midpoint && isFinite(seg.midpoint[0]) && isFinite(seg.midpoint[1])) {
+                    pendingNamePoints.push([seg.midpoint[0], seg.midpoint[1]]);
+                }
+                rows.push({
+                    lvl: lvl,
+                    street: rawName,
+                    label: trafficNameLabel(seg, rawName),
+                    speed: seg.currentSpeed,
+                    free: seg.freeFlowSpeed,
+                    len: lenKm,
+                    dist: isFinite(distM) ? distM / 1000 : null,
+                    gpsDist: isFinite(gpsM) ? gpsM / 1000 : null,
+                    lat: mid[0],
+                    lng: mid[1],
+                    color: c,
+                });
+            });
+
+            // Buang ruas yang sama (nama jalan identik) supaya tidak dobel.
+            // Yang dipertahankan: kondisi paling parah, lalu yang terpanjang.
+            const sevRank = { severe: 3, moderate: 2, ramai: 1, light: 0 };
+            const unique = [];
+            const byName = {};
+            rows.forEach(function (r) {
+                const key = normStreetKey(r.street);
+                if (!key) { unique.push(r); return; }
+                if (!Object.prototype.hasOwnProperty.call(byName, key)) {
+                    byName[key] = unique.length;
+                    unique.push(r);
+                    return;
+                }
+                const idx = byName[key];
+                const prev = unique[idx];
+                if ((sevRank[r.lvl] || 0) > (sevRank[prev.lvl] || 0) || ((sevRank[r.lvl] || 0) === (sevRank[prev.lvl] || 0) && r.len > prev.len)) {
+                    unique[idx] = r;
+                }
+            });
+            rows.length = 0;
+            rows.push.apply(rows, unique);
+
+            const order = { severe: 0, moderate: 1, ramai: 2, light: 3 };
+            rows.sort(function (a, b) { return order[a.lvl] - order[b.lvl]; });
+
+            if (count) count.textContent = rows.length ? rows.length + ' ruas' : '0';
+            if (panel) {
+                if (rows.length) panel.classList.add('active');
+                else panel.classList.remove('active');
+            }
+
+            // Keterangan kondisi jalur: jumlah ruas per level (macet parah /
+            // padat / ramai / lancar) — variasi kondisi di area ini.
+            const legendBox = document.getElementById('traffic-legend-map');
+            const cnt = { severe: 0, moderate: 0, ramai: 0, light: 0 };
+            rows.forEach(function (r) { cnt[r.lvl] = (cnt[r.lvl] || 0) + 1; });
+            ['severe', 'moderate', 'ramai', 'light'].forEach(function (k) {
+                const el = document.getElementById('tlm-cnt-' + k);
+                if (el) el.textContent = cnt[k];
+            });
+            if (legendBox) legendBox.style.display = rows.length ? 'block' : 'none';
+
+            if (!rows.length) {
+                box.innerHTML = '<div class="text-muted small px-1">Data kemacetan real-time tidak tersedia untuk area ini.</div>';
+                return;
+            }
+
+            box.innerHTML = '';
+            rows.forEach(function (r) {
+                const meta = levels[r.lvl].label;
+                const speed = (r.speed || r.free)
+                    ? ' • Kecepatan: ' + Math.round(r.speed || 0) + '/' + Math.round(r.free || 0) + ' km/jam'
+                    : '';
+                const len = r.len && r.len > 0 ? ' • Panjang ruas jalur: ' + r.len.toFixed(2) + ' km' : '';
+                const dist = (r.dist !== null && r.dist !== undefined && isFinite(r.dist))
+                    ? ' • Jarak dari tengah peta: ' + fmtTrafficDist(r.dist)
+                    : '';
+                const gps = (r.gpsDist !== null && r.gpsDist !== undefined && isFinite(r.gpsDist))
+                    ? ' • Dari Anda (GPS): ' + fmtTrafficDist(r.gpsDist)
+                    : '';
+
+                const item = document.createElement('div');
+                item.className = 'traffic-list-map-item';
+                item.style.borderLeftColor = levels[r.lvl].color;
+                item.title = 'Klik untuk zoom ke ruas jalan ini';
+                item.innerHTML =
+                    '<span>' + levels[r.lvl].icon + '</span>'
+                    + '<span><span class="tlm-name">' + r.label + '</span>'
+                    + '<span class="tlm-meta">' + meta + speed + len + dist + gps + '</span></span>';
+
+                item.addEventListener('click', function () {
+                    if (!map) return;
+                    map.setView([r.lat, r.lng], Math.max(map.getZoom(), 16));
+                });
+
+                box.appendChild(item);
+            });
+
+            // Nama jalan yang belum ada diisi di background (tidak menahan daftar).
+            if (pendingNamePoints.length) {
+                fetchMissingStreetNames(pendingNamePoints);
+            }
+        }
+
+        // Gambar polyline kemacetan (dipakai ulang saat nama jalan terisi).
+        function renderTrafficPolylines(segments) {
             congestionLayer.clearLayers();
-            segments.forEach(function (seg) {
+            const origin = trafficOriginLatLng();
+            (segments || []).forEach(function (seg) {
                 const points = seg.points || [];
                 if (points.length < 2) return;
 
                 const lvl = colorToTrafficLevel(seg.color);
+                const rawName = trafficRawName(seg);
+                const st = trafficNameLabel(seg, rawName);
+
+                let lenKm = 0;
+                for (let i = 0; i < points.length - 1; i++) {
+                    lenKm += L.latLng(points[i][0], points[i][1]).distanceTo(L.latLng(points[i + 1][0], points[i + 1][1])) / 1000;
+                }
+                const distM = minDistToPoints(points, origin);
+                const gpsM = hasUserLocation()
+                    ? minDistToPoints(points, L.latLng(window.userLatLng[0], window.userLatLng[1]))
+                    : NaN;
+                const extra = [];
+                if (lenKm > 0) extra.push('Panjang ruas jalur: ' + lenKm.toFixed(2) + ' km');
+                if (isFinite(distM)) extra.push('Jarak dari tengah peta: ' + fmtTrafficDist(distM / 1000));
+                if (isFinite(gpsM)) extra.push('Dari Anda (GPS): ' + fmtTrafficDist(gpsM / 1000));
+                const extraHtml = extra.length ? '<br><small>' + extra.join(' • ') + '</small>' : '';
+
                 L.polyline(points, { color: seg.color, weight: 6, opacity: 0.75 })
-                    .bindPopup(`<strong>${lvl.emoji} ${lvl.label}</strong><br>Ruas jalan ${seg.frc || 'utama'}`)
+                    .bindPopup(`<strong>${lvl.emoji} ${lvl.label}</strong><br>${st}${extraHtml}`)
                     .addTo(congestionLayer);
             });
+        }
+
+        function renderTomTomTraffic(segments, token) {
+            if (token !== congestionToken) return;
+            lastTrafficSegmentsMap = segments || [];
+            renderTrafficPolylines(lastTrafficSegmentsMap);
+            renderTrafficListMap(lastTrafficSegmentsMap);
         }
 
         const API_BASE = '{{ url('api/v1') }}';
@@ -683,127 +1157,36 @@ map.on('moveend', updateZoomInfo);
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
+                    congestionPendingKey = '';
                     if (token !== congestionToken) return;
                     if (data.status === 'ok' && data.segments && data.segments.length > 0) {
                         renderTomTomTraffic(data.segments, token);
                     } else {
-                        loadSimulatedCongestion(centerLat, centerLng, zoom, token);
+                        // Tidak ada data real-time untuk area ini. TIDAK dipakai
+                        // titik simulasi anymore: titik simulators memakai
+                        // tingkat &(nama jalan) rekaan sehingga tidak akurat
+                        // dengan nama jalan sebenarnya.
+                        clearTrafficMap(token);
                     }
                 })
                 .catch(function () {
-                    loadSimulatedCongestion(centerLat, centerLng, zoom, token);
+                    congestionPendingKey = '';
+                    if (token !== congestionToken) return;
+                    clearTrafficMap(token);
                 });
         }
 
-        // Fallback: titik di atas jalan OSM nyata di area peta saat ini (Overpass),
-        // dengan tingkat disesuaikan waktu setempat — bukan koordinat statis Medan.
-        function drawCongestionAt(centerLat, centerLng, point, forcedLevel, nameOverride, token) {
-            // GUARD: jangan pernah menggambar titik dengan koordinat NaN —
-            // parseFloat(null) = NaN, dan Leaflet akan meletakkannya di [0,0]
-            // (Teluk Guinea = laut), yang tampak seperti "titik macet di laut".
-            if (!isFinite(point[0]) || !isFinite(point[1]) ||
-                !isFinite(centerLat) || !isFinite(centerLng)) return;
-            if (token !== congestionToken) return;
-            const h = new Date().getHours();
-            let base;
-            if ((h >= 7 && h <= 9) || (h >= 16 && h <= 19)) base = 'severe';
-            else if ((h >= 10 && h <= 15) || (h >= 20 && h <= 22)) base = 'moderate';
-            else base = 'light';
-            let level = forcedLevel || base;
-
-            const html = level === 'severe' ? congestionIconHtml.severe
-                : level === 'moderate' ? congestionIconHtml.moderate
-                : congestionIconHtml.light;
-            const icon = L.divIcon({
-                className: '',
-                html: html,
-                iconSize: congestionIconSizes[level],
-                iconAnchor: congestionIconAnchors[level],
-            });
-            const name = nameOverride || congestionNames[Math.floor(Math.random() * congestionNames.length)];
-            const s = severityLabel(level);
-
-            // Popup hanya nama jalan + status. Teks deskriptif generik
-            // ("Sangat padat - hindari area ini", "Normal") dihapus karena
-            // tidak memberi informasi apa pun tentang lokasi jalan tsb.
-            L.marker([point[0], point[1]], { icon: icon })
-                .bindPopup(`<strong>${name}</strong><br><span style="color:${s.color}">${s.text}</span>`)
-                .addTo(congestionLayer);
-        }
-
-        function loadSimulatedCongestion(centerLat, centerLng, zoom, token) {
-            if (token !== congestionToken) return;
+        // Kosongkan layer kemacetan + panel daftar (data tidak tersedia / gagal).
+        function clearTrafficMap(token) {
+            if (token !== undefined && token !== congestionToken) return;
             congestionLayer.clearLayers();
-
-            // Minta jalan ke proxy server kita sendiri, BUKAN langsung ke
-            // Overpass. Server meng-cache per sel grid, jadi satu area hanya
-            // diambil sekali lalu dipakai bersama semua pengunjung. Ini yang
-            // mencegah Overpass membalas 429 dan memicu titik cadangan acak.
-            const b = map.getBounds();
-
-            fetchWithTimeout(API_BASE + '/traffic/roads-bounds', 20000, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    lat_min: b.getSouth(),
-                    lng_min: b.getWest(),
-                    lat_max: b.getNorth(),
-                    lng_max: b.getEast(),
-                    zoom: zoom,
-                }),
-            })
-                .then(function (r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                    return r.json();
-                })
-                .then(function (data) {
-                    if (token !== congestionToken) return;
-                    const roads = data.roads || [];
-                    if (!roads.length) {
-                        placeRandomPoints(centerLat, centerLng, token);
-                        return;
-                    }
-                    roads.forEach(function (road) {
-                        drawCongestionAt(
-                            centerLat, centerLng,
-                            [road.lat, road.lng],
-                            null, road.name, token
-                        );
-                    });
-                })
-                .catch(function () {
-                    if (token !== congestionToken) return;
-                    placeRandomPoints(centerLat, centerLng, token);
-                });
-        }
-
-        // Titik cadangan saat Overpass & TomTom tidak dapat dijangkau.
-        // Offset dihitung dari UKURAN VIEWPORT saat ini, bukan konstanta.
-        // Offset lama (0,02-0,03 derajat = 2-3 km) selalu jatuh di luar
-        // layar saat zoom >= 15, sehingga layer tampak kosong padahal
-        // markernya sudah dibuat.
-        function placeRandomPoints(baseLat, baseLng, token) {
-            if (token !== congestionToken) return;
-            const b = map.getBounds();
-            const latSpan = (b.getNorth() - b.getSouth()) * 0.6;
-            const lngSpan = (b.getEast() - b.getWest()) * 0.6;
-            const offsets = [
-                ['severe', 0.35, 0.45],
-                ['moderate', -0.55, 0.22],
-                ['light', 0.15, -0.60],
-                ['moderate', -0.35, -0.30],
-            ];
-            offsets.forEach(function (p) {
-                drawCongestionAt(
-                    baseLat, baseLng,
-                    [baseLat + latSpan * p[1], baseLng + lngSpan * p[2]],
-                    p[0], null, token
-                );
-            });
+            lastTrafficSegmentsMap = [];
+            renderTrafficListMap([]);
         }
 
         let congestionRefreshAt = 0;
         let lastBoundsKey = '';
+        let congestionPendingKey = '';
 
         // Muat data untuk area/viewport saat ini; ulangi saat peta digerakkan
         // agar garis kemacetan LIVE mengikuti seluruh daerah yang sedang dilihat.
@@ -816,8 +1199,12 @@ map.on('moveend', updateZoomInfo);
             const now = Date.now();
             // Throttle 2 dtk untuk bounds yg SAMA; bounds beda = load instan
             if (now - congestionRefreshAt < 2000 && key === lastBoundsKey) return;
+            // Request yg sama masih jalan → jangan kirim lagi (hemat kuota
+            // TomTom & jangan balapanrespons).
+            if (key === congestionPendingKey) return;
             congestionRefreshAt = now;
             lastBoundsKey = key;
+            congestionPendingKey = key;
 
             const c = map.getCenter();
             loadTomTomTraffic(c.lat, c.lng, zoom, ++congestionToken);
@@ -832,16 +1219,21 @@ map.on('moveend', updateZoomInfo);
 
         overlays['🚦 Kemacetan'] = congestionLayer;
         map.addLayer(congestionLayer);
+        document.getElementById('traffic-panel-map')?.classList.add('active');
+        renderTrafficListMap(lastTrafficSegmentsMap);
 
         L.control.layers(baseMaps, overlays, { collapsed: true, autoZIndex: false, position: 'topright' }).addTo(map);
 
         loadLocationsData();
 
+        // Keterangan kondisi jalur (macet parah / padat / ramai / lancar).
+        // Dipakai di legenda peta pojok kanan bawah, dan jumlah ruas per level
+        // ditampilkan di panel "Titik macet di area ini" (#traffic-legend-map).
         const congestionLegend = [
-            ['#e60000', 'Macet Parah'],
-            ['#e6b800', 'Padat'],
-            ['#60a5fa', 'Ramai'],
-            ['#a4c3d3', 'Lancar']
+            ['#e60000', '{{ __('messages.jam_severe') }}'],
+            ['#e6b800', '{{ __('messages.jam_heavy') }}'],
+            ['#60a5fa', '{{ __('messages.jam_busy') }}'],
+            ['#16a34a', '{{ __('messages.jam_flow') }}']
         ];
 
         // Legend: dedupe warna yang benar-benar dipakai marker, agar tidak
@@ -923,9 +1315,20 @@ map.on('moveend', updateZoomInfo);
                 });
         }
 
+        // Jarak dihitung dari tengah peta, jadi harus dihitung ulang setiap
+        // kali peta digeser/di-zoom (tanpa perlu request data baru).
+        map.on('moveend', function () {
+            ensureUserLocation();
+            if (lastTrafficSegmentsMap && lastTrafficSegmentsMap.length) {
+                renderTrafficListMap(lastTrafficSegmentsMap);
+            }
+        });
+
+        // Leaflet memicu 'moveend' SETELAH 'zoomend' (zoom juga memicu
+        // moveend), jadi cukup dengar 'moveend' agar tidak ada request ganda.
         map.on('moveend', loadCongestionForBounds);
-        map.on('zoomend', loadCongestionForBounds);
         loadCongestionForBounds();
+        ensureUserLocation();
 
         document.getElementById('btn-routing').addEventListener('click', function () {
             document.getElementById('routing-panel').classList.toggle('active');
@@ -1028,8 +1431,26 @@ map.on('moveend', updateZoomInfo);
 
         // ── Lokasi Terkini (GPS) & autocomplete — sama seperti halaman Navigasi ──
         function rtNominatimSearch(q) {
-            const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=8&countrycodes=id&q=' + encodeURIComponent(q);
-            return fetch(url, { headers: { 'Accept-Language': 'id' } }).then(function (r) { return r.json(); });
+            const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=12&countrycodes=id&addressdetails=1&q=' + encodeURIComponent(q);
+            return fetch(url, { headers: { 'Accept-Language': 'id', 'User-Agent': 'GIS-Laravel/1.0' } }).then(function (r) { return r.json(); });
+        }
+
+        function rtGeoapifySearch(q) {
+            const key = '131b2d306a254ed8b9cef2377f6bdc82';
+            const url = 'https://api.geoapify.com/v1/geocode/autocomplete?text=' + encodeURIComponent(q) + '&lang=id&limit=10&filter=countrycode:id&apiKey=' + encodeURIComponent(key);
+            return fetch(url).then(function (r) { return r.json(); }).then(function (json) {
+                const features = json && json.features ? json.features : [];
+                return features.map(function (f) {
+                    const p = f.properties || {};
+                    const coords = f.geometry && f.geometry.coordinates ? f.geometry.coordinates : [0,0];
+                    return {
+                        display_name: p.formatted || p.address_line1 || p.city || q,
+                        lat: coords[1],
+                        lon: coords[0],
+                        source: 'geoapify'
+                    };
+                });
+            });
         }
 
         function renderRouteSuggest(sugg, results, key) {
@@ -1072,11 +1493,37 @@ map.on('moveend', updateZoomInfo);
                     return { name: p.name, lat: parseFloat(p.latitude), lng: parseFloat(p.longitude), source: 'db', color: p.category_color || '#0d6efd' };
                 });
             if (local.length) { renderRouteSuggest(sugg, local, key); return; }
-            rtNominatimSearch(q).then(function (res) {
-                const osm = (res || []).map(function (r) {
-                    return { name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon), source: 'osm' };
+            Promise.allSettled([
+                rtNominatimSearch(q),
+                rtGeoapifySearch(q)
+            ]).then(function (results) {
+                const out = [];
+                const seen = new Set();
+                function add(item) {
+                    if (!item || !item.name) return;
+                    const k = item.name.substring(0, 60).toLowerCase();
+                    if (seen.has(k)) return;
+                    seen.add(k);
+                    out.push(item);
+                }
+                if (results[0].status === 'fulfilled') {
+                    (results[0].value || []).forEach(function (r) {
+                        add({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon), source: 'osm' });
+                    });
+                }
+                if (results[1].status === 'fulfilled') {
+                    (results[1].value || []).forEach(function (r) {
+                        add({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon), source: 'geoapify' });
+                    });
+                }
+                // Prioritaskan hasil yang mengandung kata kunci "tanjung"
+                const ql2 = q.toLowerCase();
+                out.sort(function (a,b) {
+                    const aa = a.name.toLowerCase().includes(ql2) ? 0 : 1;
+                    const bb = b.name.toLowerCase().includes(ql2) ? 0 : 1;
+                    return aa - bb;
                 });
-                renderRouteSuggest(sugg, osm, key);
+                renderRouteSuggest(sugg, out.slice(0,12), key);
             }).catch(function () { renderRouteSuggest(sugg, [], key); });
         }
 
@@ -1142,22 +1589,53 @@ map.on('moveend', updateZoomInfo);
             const q = document.getElementById('geocode-input').value;
             if (!q) return;
 
-            geocoder.geocode(q, function (results) {
-                const container = document.getElementById('geocode-results');
-                container.innerHTML = '';
-                if (results.length === 0) { container.innerHTML = '<div class="text-muted small">Tidak ditemukan.</div>'; return; }
+            const container = document.getElementById('geocode-results');
+            container.innerHTML = '<div class="text-muted small">Mencari...</div>';
 
-                results.forEach(function (r) {
+            Promise.allSettled([
+                rtNominatimSearch(q),
+                rtGeoapifySearch(q)
+            ]).then(function (results) {
+                const out = [];
+                const seen = new Set();
+                function add(r) {
+                    if (!r || !r.name) return;
+                    const k = r.name.substring(0, 60).toLowerCase();
+                    if (seen.has(k)) return;
+                    seen.add(k);
+                    out.push(r);
+                }
+                if (results[0].status === 'fulfilled') {
+                    (results[0].value || []).forEach(function (r) {
+                        add({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+                    });
+                }
+                if (results[1].status === 'fulfilled') {
+                    (results[1].value || []).forEach(function (r) {
+                        add({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+                    });
+                }
+                const ql2 = q.toLowerCase();
+                out.sort(function (a,b) {
+                    const aa = a.name.toLowerCase().includes(ql2) ? 0 : 1;
+                    const bb = b.name.toLowerCase().includes(ql2) ? 0 : 1;
+                    return aa - bb;
+                });
+                container.innerHTML = '';
+                if (out.length === 0) { container.innerHTML = '<div class="text-muted small">Tidak ditemukan.</div>'; return; }
+                out.slice(0,15).forEach(function (r) {
                     const div = document.createElement('div');
                     div.className = 'p-1 border-bottom small cursor-pointer';
                     div.style.cursor = 'pointer';
-                    div.textContent = r.name || r.center.lat + ', ' + r.center.lng;
+                    div.textContent = r.name;
                     div.addEventListener('click', function () {
-                        map.setView(r.center, 15);
-                        L.marker(r.center).addTo(map).bindPopup(r.name || '').openPopup();
+                        map.setView([r.lat, r.lng], 15);
+                        L.marker([r.lat, r.lng]).addTo(map).bindPopup(r.name || '').openPopup();
                     });
                     container.appendChild(div);
                 });
+            }).catch(function () {
+                container.innerHTML = '<div class="text-muted small">Gagal mencari.</div>';
             });
         });
 
@@ -1165,8 +1643,74 @@ map.on('moveend', updateZoomInfo);
             if (e.key === 'Enter') document.getElementById('btn-geocode-search').click();
         });
 
-        // Autocomplete untuk Cari Alamat — sama seperti Lokasi Tujuan
-        attachRouteAutocomplete('geocode-input', 'destination');
+        // Autocomplete untuk Cari Alamat — pakai search gabungan (Nominatim + Geoapify)
+        (function () {
+            const input = document.getElementById('geocode-input');
+            const sugg = document.createElement('div');
+            sugg.className = 'suggestion-box';
+            sugg.style.top = 'calc(100% + 4px)';
+            sugg.style.left = '0';
+            sugg.style.width = '100%';
+            sugg.style.display = 'none';
+            input.parentNode.style.position = 'relative';
+            input.parentNode.appendChild(sugg);
+            let timer = null;
+            input.addEventListener('input', function () {
+                clearTimeout(timer);
+                const q = input.value.trim();
+                if (q.length < 2) { sugg.style.display = 'none'; sugg.innerHTML = ''; return; }
+                timer = setTimeout(function () {
+                    Promise.allSettled([
+                        rtNominatimSearch(q),
+                        rtGeoapifySearch(q)
+                    ]).then(function (results) {
+                        const out = [];
+                        const seen = new Set();
+                        function add(r) {
+                            if (!r || !r.name) return;
+                            const k = r.name.substring(0, 60).toLowerCase();
+                            if (seen.has(k)) return;
+                            seen.add(k);
+                            out.push(r);
+                        }
+                        if (results[0].status === 'fulfilled') {
+                            (results[0].value || []).forEach(function (r) {
+                                add({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+                            });
+                        }
+                        if (results[1].status === 'fulfilled') {
+                            (results[1].value || []).forEach(function (r) {
+                                add({ name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+                            });
+                        }
+                        const ql2 = q.toLowerCase();
+                        out.sort(function (a,b) {
+                            const aa = a.name.toLowerCase().includes(ql2) ? 0 : 1;
+                            const bb = b.name.toLowerCase().includes(ql2) ? 0 : 1;
+                            return aa - bb;
+                        });
+                        if (out.length === 0) { sugg.style.display = 'none'; sugg.innerHTML = ''; return; }
+                        sugg.innerHTML = '';
+                        out.slice(0,12).forEach(function (r) {
+                            const item = document.createElement('div');
+                            item.className = 'suggestion-item';
+                            item.textContent = r.name;
+                            item.addEventListener('click', function () {
+                                input.value = r.name;
+                                sugg.style.display = 'none';
+                                map.setView([r.lat, r.lng], 15);
+                                L.marker([r.lat, r.lng]).addTo(map).bindPopup(r.name || '').openPopup();
+                            });
+                            sugg.appendChild(item);
+                        });
+                        sugg.style.display = 'block';
+                    }).catch(function () { sugg.style.display = 'none'; });
+                }, 250);
+            });
+            document.addEventListener('click', function (e) {
+                if (!sugg.contains(e.target) && e.target !== input) sugg.style.display = 'none';
+            });
+        })();
 
         map.on('contextmenu', function (e) {
             geocoder.reverse(e.latlng, map.options.crs.scale(map.getZoom()), function (results) {
@@ -1183,7 +1727,14 @@ map.on('moveend', updateZoomInfo);
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function (pos) {
                     const latlng = [pos.coords.latitude, pos.coords.longitude];
+                    window.userLatLng = latlng;
+                    userLocationRequested = true;
                     map.setView(latlng, 14);
+
+                    // Segarkan daftar kemacetan supaya kolom "Dari Anda" terisi.
+                    if (lastTrafficSegmentsMap && lastTrafficSegmentsMap.length) {
+                        renderTrafficListMap(lastTrafficSegmentsMap);
+                    }
                     
                     // Hapus marker lokasi sebelumnya jika ada
                     if (window.myLocationMarker) {

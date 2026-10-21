@@ -22,6 +22,10 @@ Route::prefix('v1')->name('api.')->group(function () {
 Route::get('traffic/flow', [\App\Http\Controllers\Api\TomTomController::class, 'flow'])->name('traffic.flow');
 Route::post('traffic/flow-along', [\App\Http\Controllers\Api\TomTomController::class, 'flowAlong'])->name('traffic.flow-along');
 Route::post('traffic/flow-bounds', [\App\Http\Controllers\Api\TomTomController::class, 'flowBounds'])->name('traffic.flow-bounds');
+// Pengisian nama jalan di background (biar daftar kemacetan tampil cepat).
+Route::post('traffic/street-names', [\App\Http\Controllers\Api\TomTomController::class, 'streetNames'])
+    ->middleware('throttle:120,1')
+    ->name('traffic.street-names');
 
 // Jalan OpenStreetMap via Overpass, di-cache di server supaya tidak
 // membanjiri rate limit Overpass setiap kali user zoom in-out.

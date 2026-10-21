@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Services\Ai\GroqService;
 use App\Services\Routing\RoutingService;
+use App\Services\Traffic\TomTomTrafficService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -14,7 +15,7 @@ use Illuminate\View\View;
 class SettingsController extends Controller
 {
     /** Kunci yang wajib diuji ke provider sebelum boleh disimpan. */
-    public const TESTABLE_KEYS = ['groq_api_key'];
+    public const TESTABLE_KEYS = ['groq_api_key', 'tomtom_api_key', 'graphhopper_api_key'];
 
     public function index(Request $request, GroqService $groq, RoutingService $routing): View
     {
@@ -51,15 +52,44 @@ class SettingsController extends Controller
      * Uji API key tanpa menyimpan. Dipakai tombol "Tes" di halaman Pengaturan
      * supaya admin bisa memastikan key benar sebelum menekan Simpan.
      */
-    public function testKey(Request $request, GroqService $groq)
+    public function testKey(Request $request, GroqService $groq, RoutingService $routing, TomTomTrafficService $tomtom)
     {
         $validated = $request->validate([
             'key' => ['nullable', 'string', 'max:200'],
             'model' => ['nullable', 'string', 'max:120'],
         ]);
 
-        // Key kosong = tes key yang sedang tersimpan (DB, lalu .env).
-        $result = $groq->validateKey($validated['key'] ?? null, $validated['model'] ?? null);
+        $keyParam = $validated['key'] ?? null;
+        $modelParam = $validated['model'] ?? null;
+
+        // Tentukan key mana yang diuji berdasarkan input atau key yang dikirim
+        $testKey = $keyParam ? $keyParam : '';
+
+        // Jika kosong, kita tidak tahu, tapi controller dipanggil dengan key spesifik
+        // Tapi untuk kompatibilitas: default ke groq
+        $target = null;
+
+        if ($keyParam) {
+            $target = $keyParam;
+        }
+
+        // Coba deteksi dari referer? Tidak. Tapi tombol kirim key name
+        // Gunakan field name dari request body? Kita kirim {key, model} tapi tidak kirim nama setting
+        // Biar aman: jika keyParam mengandung pola tomtom/graphhopper -> uji sesuai
+        $lower = strtolower((string) $keyParam);
+
+        if ($lower && str_contains($lower, 'tomtom')) {
+            $result = $tomtom->validateKey($keyParam);
+            return response()->json($result, $result['valid'] ? 200 : 422);
+        }
+
+        if ($lower && str_contains($lower, 'graphhopper')) {
+            $result = $routing->validateGraphhopperKey($keyParam);
+            return response()->json($result, $result['valid'] ? 200 : 422);
+        }
+
+        // Default: groq
+        $result = $groq->validateKey($keyParam, $modelParam);
 
         return response()->json($result, $result['valid'] ? 200 : 422);
     }
@@ -120,6 +150,32 @@ class SettingsController extends Controller
             }
 
             // Simpan pesan sukses dari tes validasi supaya terlihat di halaman.
+            $request->session()->flash('ai_key_validated', $hasil['message']);
+        }
+
+        if (isset($nilaiBaru['tomtom_api_key']) && $nilaiBaru['tomtom_api_key']['value'] !== '') {
+            $tomtom = app(\App\Services\Traffic\TomTomTrafficService::class);
+            $hasil = $tomtom->validateKey($nilaiBaru['tomtom_api_key']['value']);
+
+            if (! $hasil['valid']) {
+                return redirect()
+                    ->route('admin.settings.index', ['group' => $request->input('current_group', 'traffic')])
+                    ->withInput()
+                    ->with('error', 'API key TomTom tidak disimpan karena tidak valid: '.$hasil['message']);
+            }
+            $request->session()->flash('ai_key_validated', $hasil['message']);
+        }
+
+        if (isset($nilaiBaru['graphhopper_api_key']) && $nilaiBaru['graphhopper_api_key']['value'] !== '') {
+            $routingService = app(\App\Services\Routing\RoutingService::class);
+            $hasil = $routingService->validateGraphhopperKey($nilaiBaru['graphhopper_api_key']['value']);
+
+            if (! $hasil['valid']) {
+                return redirect()
+                    ->route('admin.settings.index', ['group' => $request->input('current_group', 'routing')])
+                    ->withInput()
+                    ->with('error', 'API key GraphHopper tidak disimpan karena tidak valid: '.$hasil['message']);
+            }
             $request->session()->flash('ai_key_validated', $hasil['message']);
         }
 

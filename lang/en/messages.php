@@ -147,6 +147,8 @@ return [
     'jam_heavy' => 'Heavy traffic',
     'jam_busy' => 'Busy',
     'jam_flow' => 'Flowing',
+    'traffic_legend_title' => 'Road condition legend',
+    'traffic_distance_hint' => 'Distances are measured from the map centre (changes when you pan) and from your position (GPS).',
     'nav_tip' => 'Pick a vehicle then press ▶ Start Navigation — the route is calculated based on vehicle type (trucks/buses are kept away from small roads & low bridges) and immediately enters fullscreen. Close with the Done button to see the route summary.',
     'congestion_loading' => 'Traffic: Loading...',
     'congestion_on' => 'Traffic: ON',

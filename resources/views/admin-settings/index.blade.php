@@ -267,7 +267,7 @@
 
                 const key = input ? input.value.trim() : '';
                 const model = modelInput ? modelInput.value : null;
-                const settingKey = input.id.replace('setting-', '');
+                const settingKey = input ? input.id.replace('setting-', '') : null;
 
                 const original = btn.innerHTML;
                 btn.disabled = true;

@@ -151,6 +151,8 @@ return [
     'jam_heavy' => 'Padat',
     'jam_busy' => 'Ramai',
     'jam_flow' => 'Lancar',
+    'traffic_legend_title' => 'Keterangan kondisi jalur',
+    'traffic_distance_hint' => 'Jarak diukur dari tengah peta (berubah saat peta digeser) dan dari posisi Anda (GPS).',
     'nav_tip' => 'Pilih kendaraan lalu tekan ▶ Mulai Navigasi — rute dihitung berdasarkan jenis kendaraan (truk/bis dijauhkan dari jalan kecil & jembatan rendah) lalu langsung masuk layar penuh. Tutup dengan tombol Selesai untuk melihat resume rute.',
     'congestion_loading' => 'Kemacetan: Memuat...',
     'congestion_on' => 'Kemacetan: ON',

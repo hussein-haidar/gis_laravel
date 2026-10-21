@@ -8,6 +8,51 @@ use Illuminate\Support\Facades\Log;
 
 class RoutingService
 {
+    /**
+     * Uji validitas API key GraphHopper tanpa menyimpan.
+     */
+    public function validateGraphhopperKey(?string $key): array
+    {
+        $key = trim((string) $key);
+
+        if ($key === '') {
+            // Coba pakai key yang sedang aktif (database dulu, lalu .env)
+            $key = Setting::credentialValue('graphhopper_api_key');
+        }
+
+        if ($key === '') {
+            return ['valid' => false, 'message' => 'API key GraphHopper kosong. Isi key terlebih dahulu.'];
+        }
+
+        try {
+            $response = Http::timeout(10)
+                ->withOptions(['verify' => false])
+                ->get('https://graphhopper.com/api/1/info', [
+                    'key' => $key,
+                ]);
+
+            if ($response->successful()) {
+                return ['valid' => true, 'message' => 'API key GraphHopper valid.'];
+            }
+
+            if ($response->status() === 401) {
+                return ['valid' => false, 'message' => 'API key GraphHopper tidak valid atau tidak diizinkan.'];
+            }
+
+            if ($response->status() === 429) {
+                return ['valid' => false, 'message' => 'Terlalu banyak permintaan ke GraphHopper. Coba lagi beberapa saat.'];
+            }
+
+            $body = $response->json();
+            $message = is_array($body) && isset($body['message']) ? (string) $body['message'] : ('Gagal menguji GraphHopper (HTTP '.$response->status().').');
+
+            return ['valid' => false, 'message' => $message];
+        } catch (\Throwable $e) {
+            Log::warning('GraphHopper key test failed: '.$e->getMessage());
+
+            return ['valid' => false, 'message' => 'Tidak dapat terhubung ke GraphHopper untuk menguji API key.'];
+        }
+    }
     public function vehicles(): array
     {
         return config('routing.vehicles', []);
