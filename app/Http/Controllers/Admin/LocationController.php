@@ -734,11 +734,15 @@ class LocationController extends Controller
             }
 
             $photoStats = $syncService->lastPhotoFetchStats();
-            if ($photoStats && $photoStats['remaining'] > 0) {
-                if ($photoStats['queued']) {
-                    $message .= ". Pengisian {$photoStats['remaining']} foto dijadwalkan di background";
+            // Defensive: $photoStats bisa null atau array tanpa key 'remaining'
+            // (mis. fetchMissingPhotos() return early, atau state leak antar request).
+            $remaining = $photoStats['remaining'] ?? 0;
+            if ($photoStats && $remaining > 0) {
+                if ($photoStats['queued'] ?? false) {
+                    $message .= ". Pengisian {$remaining} foto dijadwalkan di background";
                 } else {
-                    $message .= ". Foto: {$photoStats['success']} diisi otomatis, {$photoStats['remaining']} menunggu";
+                    $success = $photoStats['success'] ?? 0;
+                    $message .= ". Foto: {$success} diisi otomatis, {$remaining} menunggu";
                 }
             }
 

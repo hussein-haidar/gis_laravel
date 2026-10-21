@@ -513,7 +513,9 @@ class GisDataSyncService
         try {
             $stats = app(PhotoMaintenance::class)->refresh();
 
-            $this->photoFetchStats['cleanup'] = $stats;
+            if (is_array($this->photoFetchStats)) {
+                $this->photoFetchStats['cleanup'] = $stats;
+            }
         } catch (\Throwable $e) {
             Log::error('Photo maintenance after sync failed: '.$e->getMessage());
         }
