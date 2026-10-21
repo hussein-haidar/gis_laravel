@@ -247,7 +247,6 @@
 
     <form id="bulk-delete-form" action="{{ route('admin.locations.bulk-delete') }}" method="POST" style="display:none;">
         @csrf
-        @method('DELETE')
         <input type="hidden" name="ids[]" id="bulk-ids">
     </form>
 @endsection
