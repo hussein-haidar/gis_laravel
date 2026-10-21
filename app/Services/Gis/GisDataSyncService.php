@@ -272,6 +272,13 @@ class GisDataSyncService
             }
         }
 
+        // Fallback: kalau API tidak punya field 'category' (mis. GeoJSON provinsi
+        // pakai field 'state'), assign kategori default "Provinsi" supaya
+        // lokasi tidak tanpa kategori.
+        if (! isset($locationData['category_id'])) {
+            $locationData['category_id'] = $this->resolveCategory($this->config['default_category']);
+        }
+
         if (empty($locationData['latitude']) || empty($locationData['longitude'])) {
             $coords = $this->extractCoordinates($geometry, $properties);
             if ($coords) {
