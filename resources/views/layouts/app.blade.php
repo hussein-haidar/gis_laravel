@@ -110,6 +110,16 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ route('favorites.index') }}">{{ __('messages.nav_favorites') }}</a>
                     </li>
+                    {{-- Tools menu untuk user biasa: Kalkulator Jarak & Cari Radius --}}
+                    @if (! Auth::user()->hasRole('admin', 'super_admin'))
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Tools</a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{{ route('pengunjung.locations.distance') }}">Kalkulator Jarak</a></li>
+                                <li><a class="dropdown-item" href="{{ route('pengunjung.locations.radius') }}">Cari Radius</a></li>
+                            </ul>
+                        </li>
+                    @endif
                     @if (Auth::user()->hasRole('super_admin'))
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Super Admin</a>

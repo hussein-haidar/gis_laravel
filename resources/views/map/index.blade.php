@@ -1166,7 +1166,7 @@ map.on('moveend', updateZoomInfo);
             if (legendBox) legendBox.style.display = rows.length ? 'block' : 'none';
 
             if (!rows.length) {
-                box.innerHTML = '<div class="text-muted small px-1">Data kemacetan real-time tidak tersedia untuk area ini.</div>';
+                box.innerHTML = '<div class="text-muted small px-1">Titik macet di area ini.</div>';
                 return;
             }
 

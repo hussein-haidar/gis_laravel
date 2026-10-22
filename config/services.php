@@ -65,6 +65,25 @@ return [
         'auto_cleanup_after_fetch' => env('OPENVERSE_AUTO_CLEANUP_AFTER_FETCH', true),
     ],
 
+    // Custom API untuk sinkronisasi tempat wisata (JSON)
+    'custom_api' => [
+        'url' => env('WISATA_CUSTOM_API_URL'),
+        'timeout' => (int) env('WISATA_CUSTOM_API_TIMEOUT', 30),
+        'headers' => [],
+        'field_mapping' => [
+            'name' => 'name',
+            'category' => 'category',
+            'latitude' => 'latitude',
+            'longitude' => 'longitude',
+            'photo' => 'photo',
+            'description' => 'description',
+            'address' => 'address',
+            'phone' => 'phone',
+            'website' => 'website',
+            'opening_hours' => 'opening_hours',
+        ],
+    ],
+
     'groq' => [
         'key' => env('GROQ_API_KEY'),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),

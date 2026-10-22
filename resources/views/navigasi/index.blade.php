@@ -1246,7 +1246,7 @@
             if (legendBox) legendBox.style.display = rows.length ? 'block' : 'none';
 
             if (!rows.length) {
-                box.innerHTML = '<div class="text-muted small">Data kemacetan real-time tidak tersedia untuk area ini.</div>';
+                box.innerHTML = '<div class="text-muted small">Titik macet di area ini.</div>';
                 return;
             }
 
