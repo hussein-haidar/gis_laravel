@@ -157,6 +157,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('locations/impor', [LocationController::class, 'import'])->name('locations.import.store');
     Route::get('locations/template', [LocationController::class, 'template'])->name('locations.template');
     Route::post('locations/sync', [LocationController::class, 'sync'])->name('locations.sync');
+    Route::post('locations/sync-all', [LocationController::class, 'syncAll'])->name('locations.sync-all');
 
     // Kategori.
     Route::get('categories/provinsi', [CategoryController::class, 'provinces'])->name('categories.provinsi');

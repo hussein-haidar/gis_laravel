@@ -10,10 +10,12 @@ use App\Models\Location;
 use App\Models\NavigationHistory;
 use App\Models\User;
 use App\Services\Gis\GisDataSyncService;
+use App\Services\Gis\TourismPlacesSyncService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -212,28 +214,30 @@ class LocationController extends Controller
 
     public function destroy(Location $location)
     {
-        $oldValues = $location->toArray();
+        return DB::transaction(function () use ($location) {
+            $oldValues = $location->toArray();
 
-        // Delete main photo
-        if ($location->photo) {
-            Storage::disk('public')->delete($location->photo);
-        }
-
-        // Delete additional photos
-        $location->photos()->each(function ($photo) {
-            if ($photo->path) {
-                Storage::disk('public')->delete($photo->path);
+            // Delete main photo
+            if ($location->photo) {
+                Storage::disk('public')->delete($location->photo);
             }
-            $photo->delete();
+
+            // Delete additional photos
+            $location->photos()->each(function ($photo) {
+                if ($photo->path) {
+                    Storage::disk('public')->delete($photo->path);
+                }
+                $photo->delete();
+            });
+
+            $location->delete();
+
+            $this->logActivity('location_deleted', null, $oldValues, null);
+
+            return redirect()
+                ->route('admin.locations.index')
+                ->with('success', 'Lokasi berhasil dihapus.');
         });
-
-        $location->delete();
-
-        $this->logActivity('location_deleted', null, $oldValues, null);
-
-        return redirect()
-            ->route('admin.locations.index')
-            ->with('success', 'Lokasi berhasil dihapus.');
     }
 
     public function bulkDelete(Request $request)
@@ -244,26 +248,29 @@ class LocationController extends Controller
         ]);
 
         $ids = $request->ids;
-        $locations = Location::whereIn('id', $ids)->with('photos')->get();
 
-        foreach ($locations as $location) {
-            if ($location->photo) {
-                Storage::disk('public')->delete($location->photo);
-            }
-            $location->photos()->each(function ($photo) {
-                if ($photo->path) {
-                    Storage::disk('public')->delete($photo->path);
+        return DB::transaction(function () use ($ids) {
+            $locations = Location::whereIn('id', $ids)->with('photos')->lockForUpdate()->get();
+
+            foreach ($locations as $location) {
+                if ($location->photo) {
+                    Storage::disk('public')->delete($location->photo);
                 }
-                $photo->delete();
-            });
-            $this->logActivity('location_deleted', null, $location->toArray(), null);
-        }
+                $location->photos()->each(function ($photo) {
+                    if ($photo->path) {
+                        Storage::disk('public')->delete($photo->path);
+                    }
+                    $photo->delete();
+                });
+                $this->logActivity('location_deleted', null, $location->toArray(), null);
+            }
 
-        Location::whereIn('id', $ids)->delete();
+            $deleted = Location::whereIn('id', $ids)->delete();
 
-        return redirect()
-            ->route('admin.locations.index')
-            ->with('success', count($ids).' lokasi berhasil dihapus.');
+            return redirect()
+                ->route('admin.locations.index')
+                ->with('success', $deleted.' lokasi berhasil dihapus.');
+        });
     }
 
     public function radiusForm(): View
@@ -723,6 +730,47 @@ class LocationController extends Controller
         ]);
     }
 
+    public function syncAll(GisDataSyncService $gisSyncService, TourismPlacesSyncService $wisataSyncService)
+    {
+        $results = [];
+        $errors = [];
+
+        // Step 1: GIS Data Sync
+        try {
+            $gisStats = $gisSyncService->sync();
+            $results['gis'] = $gisStats;
+        } catch (\Throwable $e) {
+            $errors[] = 'GIS Sync gagal: ' . $e->getMessage();
+            Log::error('GIS sync in syncAll failed', ['error' => $e->getMessage()]);
+        }
+
+        // Step 2: Tourism Places Sync (wisata:sync)
+        try {
+            $wisataStats = $wisataSyncService->sync();
+            $results['wisata'] = $wisataStats;
+        } catch (\Throwable $e) {
+            $errors[] = 'Wisata Sync gagal: ' . $e->getMessage();
+            Log::error('Wisata sync in syncAll failed', ['error' => $e->getMessage()]);
+        }
+
+        $message = 'Sinkronisasi selesai.';
+        if (isset($results['gis'])) {
+            $g = $results['gis'];
+            $message .= sprintf(' GIS: %d dibuat, %d diperbarui.', $g['created'], $g['updated']);
+        }
+        if (isset($results['wisata'])) {
+            $w = $results['wisata'];
+            $message .= sprintf(' Wisata: %d dibuat, %d diperbarui.', $w['created'], $w['updated']);
+        }
+        if (! empty($errors)) {
+            $message .= ' Error: ' . implode('; ', $errors);
+        }
+
+        return redirect()
+            ->route('admin.locations.index')
+            ->with(empty($errors) ? 'success' : 'warning', $message);
+    }
+
     public function sync(GisDataSyncService $syncService)
     {
         try {
@@ -734,8 +782,6 @@ class LocationController extends Controller
             }
 
             $photoStats = $syncService->lastPhotoFetchStats();
-            // Defensive: $photoStats bisa null atau array tanpa key 'remaining'
-            // (mis. fetchMissingPhotos() return early, atau state leak antar request).
             $remaining = $photoStats['remaining'] ?? 0;
             if ($photoStats && $remaining > 0) {
                 if ($photoStats['queued'] ?? false) {

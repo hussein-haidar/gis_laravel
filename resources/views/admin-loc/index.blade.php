@@ -159,9 +159,13 @@
             <span>Daftar Lokasi ({{ $locations->total() }})</span>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-sm btn-danger" id="btn-bulk-delete" style="display:none;">🗑️ Hapus Terpilih (<span id="selected-count">0</span>)</button>
-                <form action="{{ route('admin.locations.sync') }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin sinkronisasi data dari API eksternal? Proses ini bisa memakan waktu beberapa detik.');">
+                <form action="{{ route('admin.locations.sync') }}" method="POST" class="d-inline">
                     @csrf
-                    <button type="submit" class="btn btn-sm btn-info">🔄 Sinkron Data API</button>
+                    <button type="submit" class="btn btn-sm btn-info">Sinkron Data GIS</button>
+                </form>
+                <form id="sync-all-form" action="{{ route('admin.locations.sync-all') }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-sync-all">Sinkronisasi Semua</button>
                 </form>
                 <a href="{{ route('admin.locations.create') }}" class="btn btn-sm btn-primary">+ Tambah Lokasi</a>
             </div>
@@ -241,7 +245,35 @@
         @endif
     </div>
 
-    <!-- Hidden bulk delete form -->
+    <!-- Sync All Modal -->
+    <div class="modal fade" id="syncAllModal" tabindex="-1" aria-labelledby="syncAllModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="syncAllModalLabel"><i class="bi bi-arrow-repeat me-2"></i>Sinkronisasi Semua</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Proses ini akan menjalankan 2 tahap:</p>
+                    <ol class="mb-3">
+                        <li><strong>Sinkron Data GIS</strong> — impor data batas wilayah/koordinat dari API GIS</li>
+                        <li><strong>Sinkron Tempat Wisata</strong> — impor tempat wisata dari Overpass/Data.go.id/Custom API</li>
+                    </ol>
+                    <p class="text-muted small mb-0">Proses bisa memakan waktu 1-5 menit. Jangan tutup halaman ini.</p>
+                    <div id="syncProgress" style="display:none;" class="mt-3">
+                        <div class="progress mb-2">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="syncProgressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <p class="small text-muted mb-0" id="syncProgressText">Memulai...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="syncAllModalConfirm">Mulai Sinkronisasi</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <form id="bulk-delete-form" action="{{ route('admin.locations.bulk-delete') }}" method="POST" style="display:none;">
         @csrf
     </form>
@@ -416,6 +448,50 @@
             }).finally(function () {
                 btn.disabled = false;
                 btn.innerHTML = 'Hapus';
+            });
+        });
+
+// Sync All button
+        document.getElementById('btn-sync-all').addEventListener('click', function () {
+            new bootstrap.Modal(document.getElementById('syncAllModal')).show();
+        });
+
+        document.getElementById('syncAllModalConfirm').addEventListener('click', function () {
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Memproses...';
+            document.getElementById('syncProgress').style.display = 'block';
+
+            const progressBar = document.getElementById('syncProgressBar');
+            const progressText = document.getElementById('syncProgressText');
+
+            progressBar.style.width = '30%';
+            progressText.textContent = 'Tahap 1/2: Sinkronisasi Data GIS...';
+
+            const form = document.getElementById('sync-all-form');
+            const formData = new FormData(form);
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'text/html' },
+            }).then(function (response) {
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Selesai!';
+                if (response.ok || response.redirected) {
+                    bootstrap.Modal.getInstance(document.getElementById('syncAllModal')).hide();
+                    showToast('Sinkronisasi semua data berhasil.', 'success');
+                    setTimeout(function () { window.location.reload(); }, 1500);
+                } else {
+                    showToast('Sinkronisasi gagal. Cek log untuk detail.', 'danger');
+                }
+            }).catch(function () {
+                showToast('Terjadi kesalahan jaringan.', 'danger');
+            }).finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = 'Mulai Sinkronisasi';
+                document.getElementById('syncProgress').style.display = 'none';
+                progressBar.style.width = '0%';
             });
         });
 
