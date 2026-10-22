@@ -16,6 +16,7 @@ return [
     'idle_logout_message' => 'You have been inactive. You will be logged out automatically in',
     'idle_stay' => 'Stay Logged In',
     'idle_logout_now' => 'Log Out Now',
+    'session_expired' => 'Your session has expired. Please log in again.',
     'idle_logged_out' => 'You were logged out automatically due to inactivity.',
     'nav_hello' => 'Hello',
     'language' => 'Language',

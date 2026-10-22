@@ -505,7 +505,21 @@
         idle.value = '1';
         form.appendChild(idle);
         document.body.appendChild(form);
-        form.submit();
+
+        // Gunakan fetch agar bisa menangani 419 (session expired) tanpa
+        // menampilkan halaman "Page Expired". Jika gagal, redirect ke login.
+        var formData = new FormData(form);
+        fetch(logoutUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+        }).then(function (response) {
+            // Berhasil atau session sudah expired → redirect ke login
+            window.location.href = '{{ route('login') }}';
+        }).catch(function () {
+            // Network error → redirect ke login juga
+            window.location.href = '{{ route('login') }}';
+        });
     }
 
     function hideWarning() {

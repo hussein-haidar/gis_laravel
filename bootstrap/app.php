@@ -59,5 +59,16 @@ return Application::configure(basePath: dirname(__DIR__))
         EventServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Saat session/CSRF expired (419), redirect ke login alih-alih
+        // menampilkan halaman "Page Expired".
+        $exceptions->respond(function ($response, $exception, $request) {
+            if ($response->getStatusCode() === 419) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Session expired.'], 419);
+                }
+                return redirect()->route('login')
+                    ->with('status', __('messages.session_expired'));
+            }
+            return $response;
+        });
     })->create();

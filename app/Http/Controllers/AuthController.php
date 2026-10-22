@@ -205,10 +205,20 @@ class AuthController extends Controller
     {
         Auth::logout();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        try {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        } catch (\Throwable $e) {
+            // Session mungkin sudah di-invalidate oleh IdleTimeoutMiddleware
+            // atau kadaluarsa. Regenerate token saja.
+            try {
+                $request->session()->regenerateToken();
+            } catch (\Throwable $e2) {
+                // Abaikan — redirect ke login tetap dilakukan
+            }
+        }
 
-        if ($request->boolean('idle')) {
+        if ($request->boolean('idle') || $request->wantsJson()) {
             return redirect()->route('login')
                 ->with('status', __('messages.idle_logged_out'));
         }

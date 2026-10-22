@@ -17,6 +17,7 @@ return [
     'idle_logout_message' => 'Anda tidak aktif. Anda akan keluar otomatis dalam',
     'idle_stay' => 'Tetap Masuk',
     'idle_logout_now' => 'Logout Sekarang',
+    'session_expired' => 'Sesi Anda telah berakhir. Silakan login kembali.',
     'idle_logged_out' => 'Anda keluar otomatis karena tidak aktif terlalu lama.',
     'nav_hello' => 'Halo',
     'language' => 'Bahasa',
