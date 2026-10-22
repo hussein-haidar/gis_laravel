@@ -247,7 +247,6 @@
 
     <form id="bulk-delete-form" action="{{ route('admin.locations.bulk-delete') }}" method="POST" style="display:none;">
         @csrf
-        <input type="hidden" name="ids[]" id="bulk-ids">
     </form>
 @endsection
 
@@ -352,9 +351,16 @@
             if (!confirm('Yakin ingin menghapus ' + selectedCount.textContent + ' lokasi terpilih?')) return;
             const ids = [];
             document.querySelectorAll('.location-check:checked').forEach(function (c) { ids.push(c.value); });
-            document.getElementById('bulk-ids').value = ids.join(',');
             const form = document.getElementById('bulk-delete-form');
-            form.innerHTML += '<input type="hidden" name="ids[]" value="' + ids.join('"><input type="hidden" name="ids[]" value="') + '">';
+            // Bersihkan input hidden lama
+            form.querySelectorAll('input[name="ids[]"]').forEach(function (el) { el.remove(); });
+            ids.forEach(function (id) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'ids[]';
+                input.value = id;
+                form.appendChild(input);
+            });
             form.submit();
         });
     </script>
