@@ -7,6 +7,7 @@ return [
     'nav_history' => 'Riwayat Perjalanan',
 
     'nav_favorites' => 'Favorit Tempat',
+    'session_expired' => 'Sesi Anda telah berakhir. Silakan login kembali.',
 
     'toolbar_route_short' => 'Rute',
 
