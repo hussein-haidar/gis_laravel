@@ -215,11 +215,7 @@
                                 <td>{{ $location->longitude }}</td>
                                 <td class="text-end">
                                     <a href="{{ route('admin.locations.edit', $location) }}" class="btn btn-sm btn-warning">Edit</a>
-                                    <form action="{{ route('admin.locations.destroy', $location) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus lokasi ini?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger">Hapus</button>
-                                    </form>
+                                    <button type="button" class="btn btn-sm btn-danger btn-delete-single" data-id="{{ $location->id }}" data-name="{{ $location->name }}">Hapus</button>
                                 </td>
                             </tr>
                         @empty
@@ -245,9 +241,57 @@
         @endif
     </div>
 
+    <!-- Hidden bulk delete form -->
     <form id="bulk-delete-form" action="{{ route('admin.locations.bulk-delete') }}" method="POST" style="display:none;">
         @csrf
     </form>
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+        <div id="appToast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="appToastBody"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel"><i class="bi bi-exclamation-triangle me-2"></i>Konfirmasi Hapus</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="deleteModalMessage">Yakin ingin menghapus lokasi ini?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-danger" id="deleteModalConfirm">Hapus</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Delete Confirmation Modal -->
+    <div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="bulkDeleteModalLabel"><i class="bi bi-exclamation-triangle me-2"></i>Konfirmasi Hapus Massal</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Yakin ingin menghapus <strong id="bulkDeleteCount">0</strong> lokasi terpilih?</p>
+                    <p class="text-muted small mt-2 mb-0">Tindakan ini tidak dapat dibatalkan.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-danger" id="bulkDeleteModalConfirm">Hapus Semua</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -326,6 +370,55 @@
         };
         legend.addTo(map);
 
+// Toast notification helper
+        function showToast(message, type) {
+            const toast = document.getElementById('appToast');
+            const body = document.getElementById('appToastBody');
+            toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info');
+            toast.classList.add('bg-' + (type || 'success'));
+            body.textContent = message;
+            const bsToast = new bootstrap.Toast(toast, { delay: 4000 });
+            bsToast.show();
+        }
+
+        // Single delete modal
+        let pendingDeleteId = null;
+        document.querySelectorAll('.btn-delete-single').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                pendingDeleteId = this.dataset.id;
+                document.getElementById('deleteModalMessage').textContent = 'Yakin ingin menghapus lokasi "' + this.dataset.name + '"?';
+                new bootstrap.Modal(document.getElementById('deleteModal')).show();
+            });
+        });
+
+        document.getElementById('deleteModalConfirm').addEventListener('click', function () {
+            if (!pendingDeleteId) return;
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menghapus...';
+
+            fetch('/admin/locations/' + pendingDeleteId, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json',
+                },
+            }).then(function (response) {
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    showToast('Lokasi berhasil dihapus.', 'success');
+                    setTimeout(function () { window.location.reload(); }, 1200);
+                } else {
+                    showToast('Gagal menghapus lokasi.', 'danger');
+                }
+            }).catch(function () {
+                showToast('Terjadi kesalahan jaringan.', 'danger');
+            }).finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = 'Hapus';
+            });
+        });
+
         // Bulk delete
         const checkAll = document.getElementById('check-all');
         const checks = document.querySelectorAll('.location-check');
@@ -348,11 +441,18 @@
         }
 
         bulkDeleteBtn.addEventListener('click', function () {
-            if (!confirm('Yakin ingin menghapus ' + selectedCount.textContent + ' lokasi terpilih?')) return;
+            document.getElementById('bulkDeleteCount').textContent = selectedCount.textContent;
+            new bootstrap.Modal(document.getElementById('bulkDeleteModal')).show();
+        });
+
+        document.getElementById('bulkDeleteModalConfirm').addEventListener('click', function () {
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menghapus...';
+
             const ids = [];
             document.querySelectorAll('.location-check:checked').forEach(function (c) { ids.push(c.value); });
             const form = document.getElementById('bulk-delete-form');
-            // Bersihkan input hidden lama
             form.querySelectorAll('input[name="ids[]"]').forEach(function (el) { el.remove(); });
             ids.forEach(function (id) {
                 const input = document.createElement('input');
@@ -361,7 +461,26 @@
                 input.value = id;
                 form.appendChild(input);
             });
-            form.submit();
+
+            const formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'text/html' },
+            }).then(function (response) {
+                if (response.ok || response.redirected) {
+                    bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
+                    showToast(ids.length + ' lokasi berhasil dihapus.', 'success');
+                    setTimeout(function () { window.location.reload(); }, 1200);
+                } else {
+                    showToast('Gagal menghapus lokasi terpilih.', 'danger');
+                }
+            }).catch(function () {
+                showToast('Terjadi kesalahan jaringan.', 'danger');
+            }).finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = 'Hapus Semua';
+            });
         });
     </script>
 @endsection
